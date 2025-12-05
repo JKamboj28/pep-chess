@@ -1,0 +1,29 @@
+# Node / React
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+
+# Env / secrets
+.env
+.env.*
+
+# Python
+venv/
+.env/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
