@@ -41,9 +41,12 @@ Object.entries(pieceImagePaths).forEach(([key, src]) => {
     />
   );
 });
-
+/*
 const API_BASE_URL =
   import.meta.env.VITE_PEP_API_URL || "http://localhost:8000";
+*/
+const API_BASE_URL =
+  import.meta.env.VITE_PEP_API_URL || "http://localhost:8001";
 
 // piece values for material diff
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
