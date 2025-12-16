@@ -6,13 +6,6 @@
 
 /* ---------- page + background ---------- */
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  overflow: hidden; /* no website scroll */
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-}
-
 html,
 body {
   margin: 0;
@@ -39,58 +32,37 @@ body {
 }
 
 /* ---------- app container ---------- */
-/*
+
 .app-root {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;   
+  align-items: center;   /* <— this actually centers main-layout */
   justify-content: flex-start;
   background: radial-gradient(circle at top, #1b283f 0, #050816 55%, #020308 100%);
-}
-*/
-
-.app-root {
-  height: 100%;
-  min-height: 0;
-  padding: 18px 24px 16px;
-  background: radial-gradient(ellipse at top, #1c2b4a 0%, #0b1220 70%);
-  color: #e8eefc;
-
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* important */
 }
 
 /* title */
 
 .title {
   text-align: center;
-  margin: 4px 0 4px;
-  font-size: clamp(1.4rem, 2.2vw, 2.2rem);
+  margin: 4px 0 4px;    /* a bit less vertical space */
+  font-size: 2.2rem;    /* slightly smaller so it doesn’t feel “out” */
   font-weight: 700;
   letter-spacing: 0.03em;
 }
 
+
 /* ---------- main layout: board + side panel ---------- */
-/*
+
 .main-layout {
   display: flex;
   gap: 28px;
   align-items: flex-start;
-  margin-top: 6px;        
+  margin-top: 6px;        /* matches the title bottom margin */
   width: max-content;
 }
-*/
 
-.main-layout {
-  flex: 1;          /* fills remaining height under the title */
-  min-height: 0;    /* important so children can scroll */
-  display: flex;
-  gap: 24px;
-  align-items: stretch;
-  justify-content: center;
-}
 /* Board + status */
 
 .board-wrapper {
@@ -134,7 +106,7 @@ body {
 }
 
 .bottom-bar {
-  margin-top: 10px;           /* hug the board */
+  margin-top: 0;           /* hug the board */
   padding: 6px 18px;       /* not too chunky */
   min-width: 380px;
   border-radius: 999px;
@@ -170,19 +142,6 @@ body {
   background: #f9fafb;
   transform: translateY(-1px);
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.6);
-}
-
-.reset-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
-}
-
-.reset-btn:disabled:hover {
-  background: #e5e7eb;
-  transform: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 /* ---------- right column: clocks + moves ---------- */
@@ -314,7 +273,7 @@ body {
 
 .moves-body {
   flex: 1;
-  overflow: auto; /* no internal scrolling */
+  overflow-y: auto;      /* internal scroll after it fills */
 }
 
 
@@ -449,19 +408,6 @@ body {
 
 /* ---------- PEP match panel ---------- */
 
-.left-panel, .right-panel {
-  min-height: 0;
-}
-
-.right-panel {
-  width: 520px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  overflow: hidden; /* prevent page overflow */
-}
-/*
 .pep-panel {
   margin-top: 2px;
   padding: 6px 10px;
@@ -470,13 +416,7 @@ body {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(147, 197, 253, 0.35);
 }
-*/
 
-.pep-panel {
-  flex: 1;         /* take remaining height */
-  min-height: 0;   /* required for overflow to work */
-  overflow: auto;  /* internal scroll only if needed */
-}
 
 .pep-title {
   margin: 0 0 8px;
@@ -755,49 +695,5 @@ body {
     min-width: 0;
     width: 100%;
   }
-}
-
-/* ===== Viewport-fit hard lock (paste at very bottom) ===== */
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  overflow: hidden; /* no page scroll */
-}
-
-.app-root {
-  height: 100vh;
-  overflow: hidden; /* no page scroll */
-  box-sizing: border-box;
-}
-
-/* critical: allow children to shrink inside flex layouts */
-.main-layout,
-.board-wrapper,
-.side-panel {
-  min-height: 0;
-}
-
-/* lock side panel width so JS math matches reality */
-.side-panel {
-  width: 625px;
-  flex: 0 0 625px;
-}
-
-/* lock moves panel height so it never pushes PEP panel down */
-.moves-panel {
-  height: 190px;
-  min-height: 190px;
-  max-height: 190px;
-  flex: 0 0 190px;
-}
-
-/* allow ONLY the move list to scroll internally */
-.moves-body {
-  overflow: auto;
-}
-
-/* do NOT allow PEP panel to create scrollbars (and don’t let it blow layout) */
-.pep-panel {
-  overflow: hidden;
 }
 

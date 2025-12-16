@@ -167,8 +167,6 @@ function shortMessage(raw, fallback = "") {
 }
 
 function App() {
-  const titleRef = useRef(null);
-  const bottomBarRef = useRef(null);
   const gameRef = useRef(new Chess());
 
   const [position, setPosition] = useState(gameRef.current.fen());
@@ -249,47 +247,12 @@ function App() {
     (whiteDepositOk ? 1 : 0) + (blackDepositOk ? 1 : 0);
 
   // fixed board width
-  //const boardWidth = 680;
-
-const [boardWidth, setBoardWidth] = useState(680);
-
-const SIDE_PANEL_W = 625; // must match CSS
-const GAP = 24;
-const PAD_X = 48;         // app-root left+right padding (24+24)
-const PAD_Y = 46;         // app-root top+bottom padding-ish + small buffer
-const MAX_BOARD = 720;    // bigger than before
-
-useEffect(() => {
-  const calc = () => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    const titleH = titleRef.current?.offsetHeight ?? 60;
-    const bottomH = bottomBarRef.current?.offsetHeight ?? 62;
-
-    const maxByWidth = vw - SIDE_PANEL_W - GAP - PAD_X;
-    const maxByHeight = vh - titleH - bottomH - PAD_Y;
-
-    const next = Math.max(360, Math.min(MAX_BOARD, maxByWidth, maxByHeight));
-    setBoardWidth(Math.floor(next));
-  };
-
-  calc();
-  window.addEventListener("resize", calc);
-  return () => window.removeEventListener("resize", calc);
-}, []);
-
+  const boardWidth = 680;
 
   const game = gameRef.current;
 
   const isGameStopped =
     flaggedSide !== null || manualResult !== null || game.isGameOver();
-
-  // Reset rules:
-  // - allowed before any move has been played
-  // - allowed after the game has ended
-  // - NOT allowed mid-game
-  const canReset = !hasStarted || isGameStopped;
 
   async function reportPepResult(result) {
     // result: "white" | "black" | "draw"
@@ -477,10 +440,6 @@ useEffect(() => {
   };
 
   const resetGame = () => {
-    // Prevent resetting once a game is in progress.
-    // Reset is only allowed before the first move, or after the game ends.
-    if (!canReset) return;
-
     // reset the board + clocks
     resetBoardOnly();
 
@@ -1167,7 +1126,7 @@ const createPepMatch = async () => {
 
   return (
     <div className="app-root">
-      <h1 ref={titleRef} className="title">PEP Chess (Core Game)</h1>
+      <h1 className="title">PEP Chess (Core Game)</h1>
 
       <div className="main-layout">
         <div className="board-wrapper">
@@ -1196,14 +1155,9 @@ const createPepMatch = async () => {
             {promotionOverlay}
           </div>
 
-          <div ref={bottomBarRef} className="bottom-bar">
+          <div className="bottom-bar">
             <span className="status-text">{status}</span>
-            <button
-              className="reset-btn"
-              onClick={resetGame}
-              disabled={!canReset}
-              title={canReset ? "" : "Reset is disabled while a game is in progress"}
-            >
+            <button className="reset-btn" onClick={resetGame}>
               Reset Game
             </button>
           </div>
