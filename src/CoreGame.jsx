@@ -325,13 +325,18 @@ function App() {
   const [copiedWhiteEscrow, setCopiedWhiteEscrow] = useState(false);
   const [copiedBlackEscrow, setCopiedBlackEscrow] = useState(false);
 
+//  const canCreatePepMatch =
+ //   !pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error";
+
   const canCreatePepMatch =
-    !pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error";
+    (!isOnline || mpSeat === "white") &&
+    (!pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error") &&
+    pepStake.trim() !== "" &&
+    pepWhiteAddress.trim() !== "" &&
+    pepBlackAddress.trim() !== "";
 
   const canAbortPepMatch =
-    pepMatchId &&
-    (pepMatchStatus === "waiting_for_deposits" ||
-      pepMatchStatus === "ready_to_play");
+    pepMatchId && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
   const stakeNumber = parseFloat(pepStake) || 0;
   const whiteDepositOk = stakeNumber > 0 && pepWhiteDeposit >= stakeNumber;
@@ -956,6 +961,14 @@ function App() {
     const gid = params.get("game");
     const pep = params.get("pep");
 
+  const stake = params.get("stake");
+  const wp = params.get("wp");
+  const bp = params.get("bp");
+
+  if (stake) setPepStake(stake);
+  if (wp) setPepWhiteAddress(wp);
+  if (bp) setPepBlackAddress(bp);
+
     if (pep) {
       setPepMatchId(pep);
       // status will be updated by polling
@@ -1490,9 +1503,54 @@ function App() {
   // Invite link:
   // - Always include ?game=<mpGameId>
   // - If PEP match exists, include &pep=<pepMatchId> so the joiner loads the same escrow
-  const inviteUrl = isOnline && mpGameId
-    ? `${window.location.origin}?game=${mpGameId}${pepMatchId ? `&pep=${pepMatchId}` : ""}`
+
+// near the top of CoreGame component with other hooks
+const [inviteCopied, setInviteCopied] = useState(false);
+
+// later, where you currently build inviteUrl
+const inviteUrl =
+  isOnline && mpGameId
+    ? `${window.location.origin}/?game=${mpGameId}` +
+      (pepMatchId ? `&pep=${encodeURIComponent(pepMatchId)}` : "") +
+      (pepStake ? `&stake=${encodeURIComponent(pepStake)}` : "") +
+      (pepWhiteAddress ? `&wp=${encodeURIComponent(pepWhiteAddress)}` : "") +
+      (pepBlackAddress ? `&bp=${encodeURIComponent(pepBlackAddress)}` : "")
     : "";
+
+const copyInvite = async () => {
+  if (!inviteUrl) return;
+
+  const done = () => {
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 1500);
+  };
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(inviteUrl);
+      done();
+      return;
+    }
+  } catch {}
+
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = inviteUrl;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (ok) {
+      done();
+      return;
+    }
+  } catch {}
+
+  window.prompt("Copy invite link:", inviteUrl);
+};
 
   return (
     <div className="app-root">
@@ -1588,8 +1646,31 @@ function App() {
         </div>
 
         {isOnline && inviteUrl && (
-          <div style={{ width: "100%", fontFamily: "monospace", opacity: 0.9 }}>
-            Invite: <span>{inviteUrl}</span>
+          <div
+            style={{
+              width: "100%",
+              fontFamily: "monospace",
+              opacity: 0.9,
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span>Invite:</span>
+
+            <a href={inviteUrl} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
+              {inviteUrl}
+            </a>
+
+            <button
+              className="control-btn"
+              onClick={copyInvite}
+              style={{ padding: "6px 12px", fontSize: 12 }}
+              type="button"
+            >
+              {inviteCopied ? "Copied" : "Copy"}
+            </button>
           </div>
         )}
 
@@ -1747,7 +1828,8 @@ function App() {
                   const value = e.target.value;
                   if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) setPepStake(value);
                 }}
-                disabled={isPepMatchLocked}
+                disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
+
               />
             </div>
 
