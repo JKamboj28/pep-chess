@@ -801,3 +801,83 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* ---------------- Multiplayer UI ---------------- */
+.modeTabs{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  max-width:1200px;
+  margin: 10px auto 0;
+  padding: 0 12px;
+}
+.tab{
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.06);
+  color: #e9eefb;
+  cursor: pointer;
+  font-weight: 600;
+}
+.tab.active{
+  background: rgba(80,150,255,0.18);
+  border-color: rgba(80,150,255,0.35);
+}
+.tabRight{
+  margin-left:auto;
+  opacity:0.85;
+  font-size: 0.95rem;
+}
+
+.mpbar{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  max-width:1200px;
+  margin: 10px auto 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.mpInput{
+  min-width: 260px;
+  flex: 1 1 260px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.25);
+  color: #e9eefb;
+  outline: none;
+}
+.mpBtn{
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.25);
+  color: #e9eefb;
+  cursor: pointer;
+  font-weight: 700;
+}
+.mpBtnSecondary{
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.08);
+  color: #e9eefb;
+  cursor: pointer;
+  font-weight: 700;
+}
+.mpMeta{
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+  font-size: 0.95rem;
+  opacity: 0.92;
+}
+.mpInvite{
+  opacity: 0.9;
+}

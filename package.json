@@ -13,9 +13,10 @@
     "@react-chess/chessground": "^1.3.4",
     "chess.js": "^1.4.0",
     "chessground": "^9.2.1",
-    "react": "^19.2.0",
+    "react": "18.3.1",
     "react-chessboard": "^2.0.7",
-    "react-dom": "^19.2.0"
+    "react-dom": "18.3.1",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
