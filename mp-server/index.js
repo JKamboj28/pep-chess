@@ -186,7 +186,8 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
 
   const { token, stake, whiteAddress, blackAddress } = req.body || {};
 
-  const seat = seatFromToken(game, token);
+  const tok = token || socket.data.token
+  const seat = seatFromToken(game, tok);
   if (seat !== "white") {
     return res.status(403).json({ error: "Only white can create the PEP match." });
   }
@@ -264,7 +265,8 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const seat = seatFromToken(game, token);
+    const tok = token || socket.data.token;
+    const seat = seatFromToken(game, tok);
     if (seat !== "white" && seat !== "black") {
       socket.emit("error_msg", { error: "Invalid token." });
       return;
@@ -310,7 +312,8 @@ io.on("connection", (socket) => {
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
+    const tok = token || socket.data.token;
+    const seat = seatFromToken(game, tok);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
@@ -325,7 +328,8 @@ io.on("connection", (socket) => {
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
+    const tok = token || socket.data.token;
+    const seat = seatFromToken(game, tok);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
@@ -348,7 +352,8 @@ io.on("connection", (socket) => {
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
+    const tok = token || socket.data.token;
+    const seat = seatFromToken(game, tok);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
