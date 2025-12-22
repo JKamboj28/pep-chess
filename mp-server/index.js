@@ -256,56 +256,57 @@ io.on("connection", (socket) => {
     broadcastState(game);
   });
 
-  socket.on("make_move", ({ gameId, token, from, to, promotion }) => {
-    const id = (gameId || socket.data.gameId || "").trim();
-    const game = games.get(id);
+    const handleMove = ({ gameId, token, from, to, promotion }) => {
+      const id = (gameId || socket.data.gameId || "").trim();
+      const game = games.get(id);
 
-    if (!game) {
-      socket.emit("error_msg", { error: "Game not found." });
-      return;
-    }
-
-    const tok = token || socket.data.token;
-    const seat = seatFromToken(game, tok);
-    if (seat !== "white" && seat !== "black") {
-      socket.emit("error_msg", { error: "Invalid token." });
-      return;
-    }
-
-    if (game.status === "ended") {
-      socket.emit("error_msg", { error: "Game already ended." });
-      return;
-    }
-
-    const expectedTurn = seat === "white" ? "w" : "b";
-    if (game.chess.turn() !== expectedTurn) {
-      socket.emit("error_msg", { error: "Not your turn." });
-      return;
-    }
-
-    try {
-      const mv = game.chess.move({
-        from,
-        to,
-        promotion: promotion || undefined,
-      });
-
-      if (!mv) {
-        socket.emit("error_msg", { error: "Illegal move." });
+      if (!game) {
+        socket.emit("error_msg", { error: "Game not found." });
         return;
       }
 
-      game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
+      const seat = seatFromToken(game, token);
+      if (seat !== "white" && seat !== "black") {
+        socket.emit("error_msg", { error: "Invalid token." });
+        return;
+      }
 
-      // clear any draw offer once a move is played
-      game.drawOffer = null;
+      if (game.status === "ended") {
+        socket.emit("error_msg", { error: "Game already ended." });
+        return;
+      }
 
-      endIfGameOver(game);
-      broadcastState(game);
-    } catch (e) {
-      socket.emit("error_msg", { error: "Move failed." });
-    }
-  });
+      const expectedTurn = seat === "white" ? "w" : "b";
+      if (game.chess.turn() !== expectedTurn) {
+        socket.emit("error_msg", { error: "Not your turn." });
+        return;
+      }
+
+      try {
+        const mv = game.chess.move({
+          from,
+          to,
+          promotion: promotion || undefined,
+        });
+
+        if (!mv) {
+          socket.emit("error_msg", { error: "Illegal move." });
+          return;
+        }
+
+        game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
+        game.drawOffer = null;
+
+        endIfGameOver(game);
+        broadcastState(game);
+      } catch (e) {
+        socket.emit("error_msg", { error: "Move failed." });
+      }
+    };
+
+    socket.on("move", handleMove);
+    socket.on("make_move", handleMove);
+
 
   socket.on("offer_draw", ({ gameId, token }) => {
     const id = (gameId || socket.data.gameId || "").trim();
