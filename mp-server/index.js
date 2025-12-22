@@ -256,7 +256,7 @@ io.on("connection", (socket) => {
     broadcastState(game);
   });
 
-  socket.on("move", ({ gameId, token, from, to, promotion }) => {
+  socket.on("make_move", ({ gameId, token, from, to, promotion }) => {
     const id = (gameId || socket.data.gameId || "").trim();
     const game = games.get(id);
 
