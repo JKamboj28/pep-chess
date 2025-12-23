@@ -8,6 +8,10 @@ const { Chess } = require("chess.js");
 
 const PORT = Number(process.env.PORT || 4000);
 
+// ---- Clock config (5 min default) ----
+const INITIAL_CLOCK_MS = Number(process.env.INITIAL_CLOCK_MS || 5 * 60 * 1000);
+const CLOCK_TICK_MS = Number(process.env.CLOCK_TICK_MS || 1000);
+
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
@@ -24,8 +28,78 @@ function newToken() {
 }
 
 function newGameId() {
-  // short-ish id for sharing
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+// Ensure fetch exists (Node 18+ has global fetch)
+// If you're on older Node, install node-fetch and uncomment the fallback.
+const _fetch = globalThis.fetch; // || ((...args) => import("node-fetch").then(m => m.default(...args)));
+
+function seatFromToken(game, token) {
+  if (!token) return "spectator";
+  if (token === game.tokens.white) return "white";
+  if (token === game.tokens.black) return "black";
+  return "spectator";
+}
+
+// ---------------- Clock helpers ----------------
+function ensureClock(game) {
+  if (game.clock) return;
+  game.clock = {
+    whiteMs: INITIAL_CLOCK_MS,
+    blackMs: INITIAL_CLOCK_MS,
+    running: false,
+    active: "w", // 'w' | 'b'
+    lastTs: null,
+  };
+}
+
+function startClockIfReady(game) {
+  ensureClock(game);
+  if (game.clock.running) return;
+  if (!game.tokens.black) return; // only once 2 players exist
+  if (game.status !== "playing") return;
+
+  game.clock.running = true;
+  game.clock.active = "w"; // white starts
+  game.clock.lastTs = nowMs();
+}
+
+function pauseClock(game) {
+  if (!game.clock) return;
+  game.clock.running = false;
+  game.clock.lastTs = null;
+}
+
+function tickClock(game) {
+  if (!game.clock?.running) return;
+  if (game.status !== "playing") return;
+
+  const now = nowMs();
+  const last = game.clock.lastTs ?? now;
+  const elapsed = now - last;
+  if (elapsed <= 0) return;
+
+  if (game.clock.active === "w") game.clock.whiteMs -= elapsed;
+  else game.clock.blackMs -= elapsed;
+
+  game.clock.lastTs = now;
+
+  // timeout check
+  if (game.clock.whiteMs <= 0 || game.clock.blackMs <= 0) {
+    game.status = "ended";
+    game.reason = "timeout";
+    game.result = game.clock.whiteMs <= 0 && game.clock.blackMs <= 0
+      ? "1/2-1/2"
+      : game.clock.whiteMs <= 0
+        ? "0-1"
+        : "1-0";
+    pauseClock(game);
+  }
 }
 
 function stateFor(game) {
@@ -42,22 +116,23 @@ function stateFor(game) {
 
     pep: game.pep,
 
+    // clock fields (top-level + nested for compatibility)
+    whiteTimeMs: game.clock?.whiteMs ?? null,
+    blackTimeMs: game.clock?.blackMs ?? null,
+    clock: game.clock
+      ? {
+          whiteMs: game.clock.whiteMs,
+          blackMs: game.clock.blackMs,
+          running: game.clock.running,
+          active: game.clock.active,
+        }
+      : null,
+
     players: {
-      white: game.tokens.white
-        ? { connected: !!game.connected.white }
-        : null,
-      black: game.tokens.black
-        ? { connected: !!game.connected.black }
-        : null,
+      white: game.tokens.white ? { connected: !!game.connected.white } : null,
+      black: game.tokens.black ? { connected: !!game.connected.black } : null,
     },
   };
-}
-
-function seatFromToken(game, token) {
-  if (!token) return "spectator";
-  if (token === game.tokens.white) return "white";
-  if (token === game.tokens.black) return "black";
-  return "spectator";
 }
 
 function endIfGameOver(game) {
@@ -69,10 +144,10 @@ function endIfGameOver(game) {
   }
 
   game.status = "ended";
+  pauseClock(game);
 
   if (game.chess.isCheckmate()) {
-    // side to move is checkmated
-    const loserTurn = game.chess.turn(); // 'w' or 'b'
+    const loserTurn = game.chess.turn(); // side to move is checkmated
     const winner = loserTurn === "w" ? "black" : "white";
     game.result = winner === "white" ? "1-0" : "0-1";
     game.reason = "checkmate";
@@ -97,7 +172,6 @@ function endIfGameOver(game) {
     return;
   }
 
-  // generic draw
   game.result = "1/2-1/2";
   game.reason = "draw";
 }
@@ -106,6 +180,7 @@ function broadcastState(game) {
   io.to(game.id).emit("state", stateFor(game));
 }
 
+// ------------- HTTP -------------
 app.get("/health", (_, res) => res.json({ ok: true }));
 
 // Create a new online game (creator becomes white)
@@ -114,7 +189,7 @@ app.post("/api/games", (req, res) => {
 
   const game = {
     id,
-    createdAt: Date.now(),
+    createdAt: nowMs(),
     status: "waiting",
     chess: new Chess(),
     tokens: {
@@ -130,17 +205,25 @@ app.post("/api/games", (req, res) => {
     result: "",
     reason: "",
 
-  pep: {
-    stake: null,
-    whiteAddress: null,
-    blackAddress: null,
-    matchId: null,
-    whiteEscrow: null,
-    blackEscrow: null,
-    status: null, // e.g. "created" | "waiting_for_deposits" | ...
-    error: null,
-  },
-};
+    pep: {
+      stake: null,
+      whiteAddress: null,
+      blackAddress: null,
+      matchId: null,
+      whiteEscrow: null,
+      blackEscrow: null,
+      status: null, // e.g. "created" | "waiting_for_deposits" | ...
+      error: null,
+    },
+
+    clock: {
+      whiteMs: INITIAL_CLOCK_MS,
+      blackMs: INITIAL_CLOCK_MS,
+      running: false,
+      active: "w",
+      lastTs: null,
+    },
+  };
 
   games.set(id, game);
 
@@ -157,15 +240,12 @@ app.post("/api/games/:id/join", (req, res) => {
   const id = (req.params.id || "").trim();
   const game = games.get(id);
 
-  if (!game) {
-    return res.json({ error: "Game not found." });
-  }
-  if (game.tokens.black) {
-    return res.json({ error: "Game already has 2 players." });
-  }
+  if (!game) return res.json({ error: "Game not found." });
+  if (game.tokens.black) return res.json({ error: "Game already has 2 players." });
 
   game.tokens.black = newToken();
   game.status = "playing";
+  startClockIfReady(game);
 
   res.json({
     gameId: game.id,
@@ -179,15 +259,14 @@ app.post("/api/games/:id/join", (req, res) => {
 
 const API_BASE = process.env.PEPCHESS_API_URL || "http://127.0.0.1:8001";
 
+// Create PEP match (only white)
 app.post("/api/games/:id/pep/create", async (req, res) => {
   const id = (req.params.id || "").trim();
   const game = games.get(id);
   if (!game) return res.status(404).json({ error: "Game not found." });
 
   const { token, stake, whiteAddress, blackAddress } = req.body || {};
-
-  const tok = token || socket.data.token
-  const seat = seatFromToken(game, tok);
+  const seat = seatFromToken(game, token);
   if (seat !== "white") {
     return res.status(403).json({ error: "Only white can create the PEP match." });
   }
@@ -196,8 +275,12 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
     return res.status(400).json({ error: "stake, whiteAddress, blackAddress required" });
   }
 
+  if (!_fetch) {
+    return res.status(500).json({ error: "Server fetch() not available. Use Node 18+ or add node-fetch." });
+  }
+
   try {
-    const r = await fetch(`${API_BASE}/api/matches`, {
+    const r = await _fetch(`${API_BASE}/api/matches`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -210,7 +293,6 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
     const data = await r.json();
     if (!r.ok) return res.status(400).json({ error: data });
 
-    // ✅ save matchId + escrows on server
     game.pep.stake = Number(stake);
     game.pep.whiteAddress = whiteAddress;
     game.pep.blackAddress = blackAddress;
@@ -229,7 +311,7 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
   }
 });
 
-
+// ------------- Socket.io -------------
 io.on("connection", (socket) => {
   socket.on("join_game", ({ gameId, token }) => {
     const id = (gameId || "").trim();
@@ -252,69 +334,86 @@ io.on("connection", (socket) => {
       game.connected[seat] = true;
     }
 
+    // if black exists and game is playing, ensure clock started
+    if (game.tokens.black && game.status === "playing") startClockIfReady(game);
+
     socket.emit("joined", { seat, state: stateFor(game) });
     broadcastState(game);
   });
 
-    const handleMove = ({ gameId, token, from, to, promotion }) => {
-      const id = (gameId || socket.data.gameId || "").trim();
-      const game = games.get(id);
+  socket.on("move", ({ gameId, token, from, to, promotion }) => {
+    const id = (gameId || socket.data.gameId || "").trim();
+    const game = games.get(id);
 
-      if (!game) {
-        socket.emit("error_msg", { error: "Game not found." });
+    if (!game) {
+      socket.emit("error_msg", { error: "Game not found." });
+      return;
+    }
+
+    const seat = seatFromToken(game, token);
+    if (seat !== "white" && seat !== "black") {
+      socket.emit("error_msg", { error: "Invalid token." });
+      return;
+    }
+
+    if (game.status === "ended") {
+      socket.emit("error_msg", { error: "Game already ended." });
+      return;
+    }
+
+    // must be playing to move
+    if (game.status !== "playing") {
+      socket.emit("error_msg", { error: "Game not started." });
+      return;
+    }
+
+    // Tick clock BEFORE validating move to charge time spent thinking
+    tickClock(game);
+    if (game.status === "ended") {
+      broadcastState(game);
+      return;
+    }
+
+    const expectedTurn = seat === "white" ? "w" : "b";
+    if (game.chess.turn() !== expectedTurn) {
+      socket.emit("error_msg", { error: "Not your turn." });
+      return;
+    }
+
+    try {
+      const mv = game.chess.move({
+        from,
+        to,
+        promotion: promotion || undefined,
+      });
+
+      if (!mv) {
+        socket.emit("error_msg", { error: "Illegal move." });
         return;
       }
 
-      const seat = seatFromToken(game, token);
-      if (seat !== "white" && seat !== "black") {
-        socket.emit("error_msg", { error: "Invalid token." });
-        return;
+      game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
+      game.drawOffer = null;
+
+      // switch active side to the new turn
+      if (game.clock?.running) {
+        game.clock.active = game.chess.turn(); // now it's opponent's clock
+        game.clock.lastTs = nowMs();
       }
 
-      if (game.status === "ended") {
-        socket.emit("error_msg", { error: "Game already ended." });
-        return;
-      }
-
-      const expectedTurn = seat === "white" ? "w" : "b";
-      if (game.chess.turn() !== expectedTurn) {
-        socket.emit("error_msg", { error: "Not your turn." });
-        return;
-      }
-
-      try {
-        const mv = game.chess.move({
-          from,
-          to,
-          promotion: promotion || undefined,
-        });
-
-        if (!mv) {
-          socket.emit("error_msg", { error: "Illegal move." });
-          return;
-        }
-
-        game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
-        game.drawOffer = null;
-
-        endIfGameOver(game);
-        broadcastState(game);
-      } catch (e) {
-        socket.emit("error_msg", { error: "Move failed." });
-      }
-    };
-
-    socket.on("move", handleMove);
-    socket.on("make_move", handleMove);
-
+      endIfGameOver(game);
+      broadcastState(game);
+    } catch (e) {
+      socket.emit("error_msg", { error: "Move failed." });
+    }
+  });
 
   socket.on("offer_draw", ({ gameId, token }) => {
     const id = (gameId || socket.data.gameId || "").trim();
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const tok = token || socket.data.token;
-    const seat = seatFromToken(game, tok);
+    const seat = seatFromToken(game, token);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
@@ -329,8 +428,7 @@ io.on("connection", (socket) => {
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const tok = token || socket.data.token;
-    const seat = seatFromToken(game, tok);
+    const seat = seatFromToken(game, token);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
@@ -344,6 +442,7 @@ io.on("connection", (socket) => {
     game.result = "1/2-1/2";
     game.reason = "agreed draw";
     game.drawOffer = null;
+    pauseClock(game);
 
     broadcastState(game);
   });
@@ -353,8 +452,7 @@ io.on("connection", (socket) => {
     const game = games.get(id);
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const tok = token || socket.data.token;
-    const seat = seatFromToken(game, tok);
+    const seat = seatFromToken(game, token);
     if (seat !== "white" && seat !== "black") {
       return socket.emit("error_msg", { error: "Invalid token." });
     }
@@ -365,6 +463,7 @@ io.on("connection", (socket) => {
     game.result = winner === "white" ? "1-0" : "0-1";
     game.reason = "resignation";
     game.drawOffer = null;
+    pauseClock(game);
 
     broadcastState(game);
   });
@@ -383,6 +482,16 @@ io.on("connection", (socket) => {
     }
   });
 });
+
+// Global ticker: broadcast updated clock every second
+setInterval(() => {
+  for (const game of games.values()) {
+    if (game.status !== "playing") continue;
+    if (!game.clock?.running) continue;
+    tickClock(game);
+    broadcastState(game);
+  }
+}, CLOCK_TICK_MS);
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`mp-server listening on :${PORT}`);
