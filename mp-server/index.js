@@ -1,3 +1,6 @@
+/* eslint-disable no-console */
+"use strict";
+
 const http = require("http");
 const crypto = require("crypto");
 const express = require("express");
@@ -25,18 +28,15 @@ const games = new Map(); // gameId -> game
 function newToken() {
   return crypto.randomBytes(24).toString("hex");
 }
-
 function newGameId() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 }
-
 function nowMs() {
   return Date.now();
 }
 
-// Ensure fetch exists (Node 18+ has global fetch)
-// If you're on older Node, install node-fetch and uncomment the fallback.
-const _fetch = globalThis.fetch; // || ((...args) => import("node-fetch").then(m => m.default(...args)));
+// Node 18+ has global fetch
+const _fetch = globalThis.fetch;
 
 function seatFromToken(game, token) {
   if (!token) return "spectator";
@@ -92,11 +92,12 @@ function tickClock(game) {
   if (game.clock.whiteMs <= 0 || game.clock.blackMs <= 0) {
     game.status = "ended";
     game.reason = "timeout";
-    game.result = game.clock.whiteMs <= 0 && game.clock.blackMs <= 0
-      ? "1/2-1/2"
-      : game.clock.whiteMs <= 0
-        ? "0-1"
-        : "1-0";
+    game.result =
+      game.clock.whiteMs <= 0 && game.clock.blackMs <= 0
+        ? "1/2-1/2"
+        : game.clock.whiteMs <= 0
+          ? "0-1"
+          : "1-0";
     pauseClock(game);
   }
 }
@@ -211,7 +212,7 @@ app.post("/api/games", (req, res) => {
       matchId: null,
       whiteEscrow: null,
       blackEscrow: null,
-      status: null, // e.g. "created" | "waiting_for_deposits" | ...
+      status: null,
       error: null,
     },
 
@@ -323,9 +324,10 @@ io.on("connection", (socket) => {
 
     const seat = seatFromToken(game, token);
 
+    // bind this socket to ONE game + token
     socket.data.gameId = game.id;
-    socket.data.seat = seat;
     socket.data.token = token;
+    socket.data.seat = seat;
 
     socket.join(game.id);
 
@@ -333,22 +335,27 @@ io.on("connection", (socket) => {
       game.connected[seat] = true;
     }
 
-    // if black exists and game is playing, ensure clock started
     if (game.tokens.black && game.status === "playing") startClockIfReady(game);
 
     socket.emit("joined", { seat, state: stateFor(game) });
     broadcastState(game);
   });
 
-  socket.on("move", ({ gameId, token, from, to, promotion }) => {
-    const id = (gameId || socket.data.gameId || "").trim();
-    const game = games.get(id);
+  // IMPORTANT: do NOT trust gameId/token from client after join.
+  function getBoundGame() {
+    const id = (socket.data.gameId || "").trim();
+    if (!id) return null;
+    return games.get(id) || null;
+  }
 
+  socket.on("move", ({ from, to, promotion }) => {
+    const game = getBoundGame();
     if (!game) {
       socket.emit("error_msg", { error: "Game not found." });
       return;
     }
 
+    const token = socket.data.token;
     const seat = seatFromToken(game, token);
     if (seat !== "white" && seat !== "black") {
       socket.emit("error_msg", { error: "Invalid token." });
@@ -360,13 +367,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // must be playing to move
     if (game.status !== "playing") {
       socket.emit("error_msg", { error: "Game not started." });
       return;
     }
 
-    // Tick clock BEFORE validating move to charge time spent thinking
+    // charge thinking time before move
     tickClock(game);
     if (game.status === "ended") {
       broadcastState(game);
@@ -394,9 +400,9 @@ io.on("connection", (socket) => {
       game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
       game.drawOffer = null;
 
-      // switch active side to the new turn
+      // switch clock to opponent
       if (game.clock?.running) {
-        game.clock.active = game.chess.turn(); // now it's opponent's clock
+        game.clock.active = game.chess.turn();
         game.clock.lastTs = nowMs();
       }
 
@@ -407,30 +413,24 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("offer_draw", ({ gameId, token }) => {
-    const id = (gameId || socket.data.gameId || "").trim();
-    const game = games.get(id);
+  socket.on("offer_draw", () => {
+    const game = getBoundGame();
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
-    if (seat !== "white" && seat !== "black") {
-      return socket.emit("error_msg", { error: "Invalid token." });
-    }
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
     if (game.status !== "playing") return;
 
     game.drawOffer = seat;
     broadcastState(game);
   });
 
-  socket.on("accept_draw", ({ gameId, token }) => {
-    const id = (gameId || socket.data.gameId || "").trim();
-    const game = games.get(id);
+  socket.on("accept_draw", () => {
+    const game = getBoundGame();
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
-    if (seat !== "white" && seat !== "black") {
-      return socket.emit("error_msg", { error: "Invalid token." });
-    }
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
     if (game.status !== "playing") return;
 
     if (!game.drawOffer || game.drawOffer === seat) {
@@ -446,15 +446,12 @@ io.on("connection", (socket) => {
     broadcastState(game);
   });
 
-  socket.on("resign", ({ gameId, token }) => {
-    const id = (gameId || socket.data.gameId || "").trim();
-    const game = games.get(id);
+  socket.on("resign", () => {
+    const game = getBoundGame();
     if (!game) return socket.emit("error_msg", { error: "Game not found." });
 
-    const seat = seatFromToken(game, token);
-    if (seat !== "white" && seat !== "black") {
-      return socket.emit("error_msg", { error: "Invalid token." });
-    }
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
     if (game.status === "ended") return;
 
     const winner = seat === "white" ? "black" : "white";
@@ -468,10 +465,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    const id = socket.data.gameId;
-    if (!id) return;
-
-    const game = games.get(id);
+    const game = getBoundGame();
     if (!game) return;
 
     const seat = socket.data.seat;
@@ -482,7 +476,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Global ticker: broadcast updated clock every second
+// Global ticker: broadcast updated clock
 setInterval(() => {
   for (const game of games.values()) {
     if (game.status !== "playing") continue;
