@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const http = require("http");
 const crypto = require("crypto");
 const express = require("express");
