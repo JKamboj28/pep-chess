@@ -157,7 +157,7 @@ export default function OnlineGame() {
         ? "q"
         : undefined;
 
-    socketRef.current.emit("make_move", {
+    socketRef.current.emit("move", {
       gameId,
       token,
       from: sourceSquare,

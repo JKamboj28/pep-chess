@@ -1008,7 +1008,7 @@ function App() {
     if (!mpIsPlayer) return;
     if (!mpMyTurn) return;
     if (mpState.status !== "playing") return;
-    socketRef.current.emit("make_move", {
+    socketRef.current.emit("move", {
       gameId: mpGameId,
       token: mpToken,
       from,
