@@ -245,7 +245,7 @@ app.post("/api/games/:id/join", (req, res) => {
 
   game.tokens.black = newToken();
   game.status = "playing";
-  startClockIfReady(game);
+  //startClockIfReady(game);
 
   res.json({
     gameId: game.id,
@@ -335,7 +335,7 @@ io.on("connection", (socket) => {
       game.connected[seat] = true;
     }
 
-    if (game.tokens.black && game.status === "playing") startClockIfReady(game);
+    //if (game.tokens.black && game.status === "playing") startClockIfReady(game);
 
     socket.emit("joined", { seat, state: stateFor(game) });
     broadcastState(game);
@@ -371,6 +371,9 @@ io.on("connection", (socket) => {
       socket.emit("error_msg", { error: "Game not started." });
       return;
     }
+    
+    // Start clock on first move (prevents deposit-confirm waiting from timing out)
+    if (!game.clock?.running) startClockIfReady(game);
 
     // charge thinking time before move
     tickClock(game);
