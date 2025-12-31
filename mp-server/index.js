@@ -314,32 +314,38 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
 // ------------- Socket.io -------------
 io.on("connection", (socket) => {
   socket.on("join_game", ({ gameId, token }) => {
-    const id = (gameId || "").trim();
-    const game = games.get(id);
+  const id = (gameId || "").trim();
+  const game = games.get(id);
 
-    if (!game) {
-      socket.emit("error_msg", { error: "Game not found." });
-      return;
-    }
+  if (!game) {
+    socket.emit("error_msg", { error: "Game not found." });
+    return;
+  }
 
-    const seat = seatFromToken(game, token);
+  let seat = seatFromToken(game, token);
 
-    // bind this socket to ONE game + token
-    socket.data.gameId = game.id;
-    socket.data.token = token;
-    socket.data.seat = seat;
+  // ✅ If someone joins from an invite link (no token) and black is free, assign them as black
+  if (seat === "spectator" && !game.tokens.black) {
+    game.tokens.black = newToken();
+    game.status = "playing";
+    token = game.tokens.black;
+    seat = "black";
+  }
 
-    socket.join(game.id);
+  socket.data.gameId = game.id;
+  socket.data.token = token;
+  socket.data.seat = seat;
 
-    if (seat === "white" || seat === "black") {
-      game.connected[seat] = true;
-    }
+  socket.join(game.id);
 
-    //if (game.tokens.black && game.status === "playing") startClockIfReady(game);
+  if (seat === "white" || seat === "black") {
+    game.connected[seat] = true;
+  }
 
-    socket.emit("joined", { seat, state: stateFor(game) });
-    broadcastState(game);
-  });
+  // send token back so client can store it
+  socket.emit("joined", { seat, token, state: stateFor(game) });
+  broadcastState(game);
+});
 
   // IMPORTANT: do NOT trust gameId/token from client after join.
   function getBoundGame() {
@@ -371,7 +377,7 @@ io.on("connection", (socket) => {
       socket.emit("error_msg", { error: "Game not started." });
       return;
     }
-    
+
     // Start clock on first move (prevents deposit-confirm waiting from timing out)
     if (!game.clock?.running) startClockIfReady(game);
 
