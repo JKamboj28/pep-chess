@@ -105,8 +105,9 @@ export default function OnlineGame() {
 
     s.on("disconnect", () => setConnected(false));
 
-    s.on("joined", (payload: { seat: Seat; state: PublicState }) => {
+    s.on("joined", (payload: { seat: Seat; token?: string; state: PublicState }) => {
       setSeat(payload.seat);
+      if (payload.token) setToken(payload.token);
       setState(payload.state);
     });
 
@@ -154,9 +155,7 @@ export default function OnlineGame() {
         ? "q"
         : undefined;
 
-    socketRef.current.emit("make_move", {
-      gameId,
-      token,
+    socketRef.current.emit("move", {
       from: sourceSquare,
       to: targetSquare,
       promotion
