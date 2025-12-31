@@ -16,6 +16,17 @@ type PublicState = {
   moves: Array<{ from: string; to: string; promotion: string | null; san: string; by: Seat; ts: string }>;
   players: { white: { connected: boolean } | null; black: { connected: boolean } | null };
   drawOffer: { by: Seat; ts: string } | null;
+
+  // ✅ CLOCK FIELDS (sent by your server)
+  whiteTimeMs: number | null;
+  blackTimeMs: number | null;
+  clock: null | {
+    whiteMs: number;
+    blackMs: number;
+    running: boolean;
+    active: "w" | "b";
+    lastTs?: number;
+  };
 };
 
 const MP_URL = (import.meta as any).env?.VITE_MP_SERVER_URL || "http://localhost:4000";
@@ -31,6 +42,14 @@ function loadSession() {
   const token = localStorage.getItem("pepchess_token") || "";
   const seat = (localStorage.getItem("pepchess_seat") as Seat) || "spectator";
   return { gameId, token, seat };
+}
+
+function formatMs(ms: number | null | undefined) {
+  if (ms == null) return "--:--";
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export default function OnlineGame() {
@@ -55,35 +74,41 @@ export default function OnlineGame() {
     } catch {
       // ignore
     }
-  }, [state?.fen]);
+  }, [state?.fen, chess]);
 
   async function createGame() {
     setStatusMsg("Creating game...");
     const r = await fetch(`${MP_URL}/api/games`, { method: "POST" });
     const data = await r.json();
+
     setGameId(data.gameId);
     setToken(data.token);
     setSeat(data.color);
     setState(data.state);
     saveSession(data.gameId, data.token, data.color);
+
     setStatusMsg("Game created.");
   }
 
   async function joinGame() {
     const id = joinInput.trim();
     if (!id) return;
+
     setStatusMsg("Joining game...");
     const r = await fetch(`${MP_URL}/api/games/${id}/join`, { method: "POST" });
     const data = await r.json();
+
     if (data.error) {
       setStatusMsg(`Join failed: ${data.error}`);
       return;
     }
+
     setGameId(data.gameId);
     setToken(data.token);
     setSeat(data.color);
     setState(data.state);
     saveSession(data.gameId, data.token, data.color);
+
     setStatusMsg(`Joined as ${data.color}.`);
   }
 
@@ -180,16 +205,22 @@ export default function OnlineGame() {
     localStorage.removeItem("pepchess_gameId");
     localStorage.removeItem("pepchess_token");
     localStorage.removeItem("pepchess_seat");
+
     setGameId("");
     setToken("");
     setSeat("spectator");
     setState(null);
+
     setStatusMsg("Cleared session.");
     socketRef.current?.disconnect();
     socketRef.current = null;
   }
 
   const inviteLink = gameId ? `${window.location.origin}?game=${gameId}` : "";
+
+  const active = state?.clock?.active; // "w" | "b" | undefined
+  const whiteMs = state?.whiteTimeMs ?? state?.clock?.whiteMs ?? null;
+  const blackMs = state?.blackTimeMs ?? state?.clock?.blackMs ?? null;
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: 16 }}>
@@ -228,11 +259,47 @@ export default function OnlineGame() {
 
       <div style={{ display: "grid", gridTemplateColumns: "520px 1fr", gap: 16, marginTop: 16 }}>
         <div>
-          <Chessboard
-            position={state?.fen || chess.fen()}
-            boardOrientation={orientation}
-            onPieceDrop={onDrop}
-          />
+          {/* CLOCKS */}
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
+            <div
+              style={{
+                padding: 10,
+                border: "1px solid #333",
+                borderRadius: 8,
+                minWidth: 140,
+                fontFamily: "monospace",
+                opacity: state?.status === "playing" ? 1 : 0.8,
+                outline: active === "b" ? "2px solid #555" : "none"
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>BLACK</div>
+              <div style={{ fontSize: 22 }}>{formatMs(blackMs)}</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                {state?.players?.black?.connected ? "connected" : "not connected"}
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: 10,
+                border: "1px solid #333",
+                borderRadius: 8,
+                minWidth: 140,
+                fontFamily: "monospace",
+                opacity: state?.status === "playing" ? 1 : 0.8,
+                outline: active === "w" ? "2px solid #555" : "none"
+              }}
+            >
+              <div style={{ fontWeight: 800, marginBottom: 6 }}>WHITE</div>
+              <div style={{ fontSize: 22 }}>{formatMs(whiteMs)}</div>
+              <div style={{ fontSize: 12, opacity: 0.85 }}>
+                {state?.players?.white?.connected ? "connected" : "not connected"}
+              </div>
+            </div>
+          </div>
+
+          <Chessboard position={state?.fen || chess.fen()} boardOrientation={orientation} onPieceDrop={onDrop} />
+
           <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <button onClick={resign} disabled={!isPlayer || state?.status !== "playing"}>
               Resign
@@ -247,6 +314,7 @@ export default function OnlineGame() {
               Accept Draw
             </button>
           </div>
+
           {state?.drawOffer && (
             <div style={{ marginTop: 8 }}>
               Draw offered by: <b>{state.drawOffer.by}</b>
@@ -256,9 +324,7 @@ export default function OnlineGame() {
 
         <div style={{ padding: 12, border: "1px solid #333", borderRadius: 8 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Moves</div>
-          <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
-            {state?.pgn || ""}
-          </div>
+          <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>{state?.pgn || ""}</div>
 
           <div style={{ marginTop: 12, opacity: 0.9 }}>{statusMsg}</div>
 
