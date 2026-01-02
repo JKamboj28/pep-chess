@@ -287,19 +287,21 @@ function App() {
       : false;
 
 // ----- Online clock values coming from mp-server state -----
-const onlineWhiteMs = mpState?.whiteTimeMs ?? mpState?.clock?.whiteMs ?? START_TIME_MS;
-const onlineBlackMs = mpState?.blackTimeMs ?? mpState?.clock?.blackMs ?? START_TIME_MS;
+const onlineWhiteMs = mpState?.clock?.whiteMs ?? mpState?.whiteTimeMs ?? START_TIME_MS;
 
-const onlineClockActive = mpState?.clock?.active ?? null; // 'w' | 'b'
+const onlineBlackMs = mpState?.clock?.blackMs ?? mpState?.blackTimeMs ?? START_TIME_MS;
+
+const onlineClockActive = mpState?.clock?.active ?? mpState?.turn ?? "w";
 const onlineClockRunning = !!mpState?.clock?.running && mpState?.status === "playing";
-
-const blackClockActive = isOnline
-  ? onlineClockRunning && onlineClockActive === "b"
-  : activeColor === "b" && !gameEnded;
 
 const whiteClockActive = isOnline
   ? onlineClockRunning && onlineClockActive === "w"
-  : activeColor === "w" && !gameEnded;
+  : activeColor === "w";
+
+const blackClockActive = isOnline
+  ? onlineClockRunning && onlineClockActive === "b"
+  : activeColor === "b";
+
 
   // ---------------------------
   // PEP match / escrow state (kept)
