@@ -64,6 +64,44 @@ const CAPTURE_ORDER = ["q", "r", "b", "n", "p"];
 
 const START_TIME_MS = 5 * 60 * 1000; // 5+0 blitz
 
+const START_COUNTS = { p: 8, n: 2, b: 2, r: 2, q: 1 };
+
+function pieceCountsFromFen(fen) {
+  const placement = (fen || "").split(" ")[0] || "";
+  const counts = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+  };
+
+  for (const ch of placement) {
+    if (ch === "/" || ch === " ") continue;
+    if (ch >= "1" && ch <= "8") continue; // empty squares
+
+    const isUpper = ch === ch.toUpperCase();
+    const color = isUpper ? "w" : "b";
+    const type = ch.toLowerCase();
+
+    if (counts[color][type] !== undefined) counts[color][type] += 1;
+  }
+
+  return counts;
+}
+
+function capturedFromFen(fen) {
+  const counts = pieceCountsFromFen(fen);
+
+  const capByWhite = { p: 0, n: 0, b: 0, r: 0, q: 0 }; // white captured black pieces
+  const capByBlack = { p: 0, n: 0, b: 0, r: 0, q: 0 }; // black captured white pieces
+
+  for (const t of Object.keys(START_COUNTS)) {
+    capByWhite[t] = Math.max(0, START_COUNTS[t] - (counts.b[t] || 0));
+    capByBlack[t] = Math.max(0, START_COUNTS[t] - (counts.w[t] || 0));
+  }
+
+  return { capByWhite, capByBlack };
+}
+
+
 function formatTime(ms) {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
@@ -384,13 +422,18 @@ const blackClockActive = isOnline
     pepWhiteAddress.trim() !== "" &&
     pepBlackAddress.trim() !== "";
 
-  const canAbortPepMatch =
-    pepMatchId && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
+  const hasAnyGameMove = isOnline
+    ? ((mpState?.moves?.length ?? 0) > 0)
+    : (moves.length > 0);
+
+const canAbortPepMatch = pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
   const stakeNumber = parseFloat(pepStake) || 0;
   const whiteDepositOk = stakeNumber > 0 && pepWhiteDeposit >= stakeNumber;
   const blackDepositOk = stakeNumber > 0 && pepBlackDeposit >= stakeNumber;
   const confirmedDeposits = (whiteDepositOk ? 1 : 0) + (blackDepositOk ? 1 : 0);
+  const showWhiteEscrow = !isOnline ? true : mpSeat === "white";
+  const showBlackEscrow = !isOnline ? true : mpSeat === "black";
 
   // fixed board width
   const [boardWidth, setBoardWidth] = useState(680);
@@ -969,6 +1012,15 @@ const blackClockActive = isOnline
     try {
       mpChessRef.current.load(mpState.fen);
     } catch {}
+
+    // captured pieces (online) — compute from current FEN
+    try {
+      const { capByWhite, capByBlack } = capturedFromFen(mpState.fen);
+      setCapturedByWhite(capByWhite);
+      setCapturedByBlack(capByBlack);
+    } catch {
+      // ignore
+    }
 
     // last move highlight
     if (Array.isArray(mpState.moves) && mpState.moves.length > 0) {
@@ -1970,47 +2022,52 @@ const copyInvite = async () => {
             </button>
 
             {/* Escrow addresses (with copy buttons) */}
-            <div className="pep-address-row">
-              <div className="pep-status-label">White escrow</div>
-              <div className="pep-escrow-address-row">
-                <div className="pep-escrow-address">{pepWhiteEscrow || "—"}</div>
-                <button
-                  type="button"
-                  className="pep-copy-btn"
-                  onClick={() => {
-                    if (!pepWhiteEscrow) return;
-                    navigator.clipboard.writeText(pepWhiteEscrow);
-                    setCopiedWhiteEscrow(true);
-                    setTimeout(() => setCopiedWhiteEscrow(false), 1500);
-                  }}
-                  disabled={!pepWhiteEscrow}
-                >
-                  Copy
-                </button>
-                {copiedWhiteEscrow && <span className="pep-copy-msg">Copied!</span>}
+            {showWhiteEscrow && (
+              <div className="pep-address-row">
+                <div className="pep-status-label">White escrow</div>
+                <div className="pep-escrow-address-row">
+                  <div className="pep-escrow-address">{pepWhiteEscrow || "—"}</div>
+                  <button
+                    type="button"
+                    className="pep-copy-btn"
+                    onClick={() => {
+                      if (!pepWhiteEscrow) return;
+                      navigator.clipboard.writeText(pepWhiteEscrow);
+                      setCopiedWhiteEscrow(true);
+                      setTimeout(() => setCopiedWhiteEscrow(false), 1500);
+                    }}
+                    disabled={!pepWhiteEscrow}
+                  >
+                    Copy
+                  </button>
+                  {copiedWhiteEscrow && <span className="pep-copy-msg">Copied!</span>}
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="pep-address-row">
-              <div className="pep-status-label">Black escrow</div>
-              <div className="pep-escrow-address-row">
-                <div className="pep-escrow-address">{pepBlackEscrow || "—"}</div>
-                <button
-                  type="button"
-                  className="pep-copy-btn"
-                  onClick={() => {
-                    if (!pepBlackEscrow) return;
-                    navigator.clipboard.writeText(pepBlackEscrow);
-                    setCopiedBlackEscrow(true);
-                    setTimeout(() => setCopiedBlackEscrow(false), 1500);
-                  }}
-                  disabled={!pepBlackEscrow}
-                >
-                  Copy
-                </button>
-                {copiedBlackEscrow && <span className="pep-copy-msg">Copied!</span>}
+            {showBlackEscrow && (
+              <div className="pep-address-row">
+                <div className="pep-status-label">Black escrow</div>
+                <div className="pep-escrow-address-row">
+                  <div className="pep-escrow-address">{pepBlackEscrow || "—"}</div>
+                  <button
+                    type="button"
+                    className="pep-copy-btn"
+                    onClick={() => {
+                      if (!pepBlackEscrow) return;
+                      navigator.clipboard.writeText(pepBlackEscrow);
+                      setCopiedBlackEscrow(true);
+                      setTimeout(() => setCopiedBlackEscrow(false), 1500);
+                    }}
+                    disabled={!pepBlackEscrow}
+                  >
+                    Copy
+                  </button>
+                  {copiedBlackEscrow && <span className="pep-copy-msg">Copied!</span>}
+                </div>
               </div>
-            </div>
+            )}
+
 
             {pepEscrowAddress && (
               <div className="pep-escrow">
