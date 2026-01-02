@@ -286,6 +286,21 @@ function App() {
         (mpState.turn === "b" && mpSeat === "black")
       : false;
 
+// ----- Online clock values coming from mp-server state -----
+const onlineWhiteMs = mpState?.whiteTimeMs ?? mpState?.clock?.whiteMs ?? START_TIME_MS;
+const onlineBlackMs = mpState?.blackTimeMs ?? mpState?.clock?.blackMs ?? START_TIME_MS;
+
+const onlineClockActive = mpState?.clock?.active ?? null; // 'w' | 'b'
+const onlineClockRunning = !!mpState?.clock?.running && mpState?.status === "playing";
+
+const blackClockActive = isOnline
+  ? onlineClockRunning && onlineClockActive === "b"
+  : activeColor === "b" && !gameEnded;
+
+const whiteClockActive = isOnline
+  ? onlineClockRunning && onlineClockActive === "w"
+  : activeColor === "w" && !gameEnded;
+
   // ---------------------------
   // PEP match / escrow state (kept)
   // ---------------------------
@@ -1728,9 +1743,15 @@ const copyInvite = async () => {
         <div className="side-panel">
           {/* Black clock + captured row */}
           <div className="clock-block">
+            {/*
             <div className={"clock" + (!isOnline && activeColor === "b" && !gameEnded ? " clock-active" : "")}>
               <span className="clock-label">BLACK</span>
               <span className="clock-time">{formatTime(isOnline ? START_TIME_MS : blackTime)}</span>
+            </div>
+            */}
+            <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
+              <span className="clock-label">BLACK</span>
+              <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
             </div>
             {!isOnline && renderCapturedRow("b")}
           </div>
@@ -1756,9 +1777,15 @@ const copyInvite = async () => {
 
           {/* White clock + captured row */}
           <div className="clock-block">
+            {/*
             <div className={"clock" + (!isOnline && activeColor === "w" && !gameEnded ? " clock-active" : "")}>
               <span className="clock-label">WHITE</span>
               <span className="clock-time">{formatTime(isOnline ? START_TIME_MS : whiteTime)}</span>
+            </div>
+            */}
+            <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
+              <span className="clock-label">WHITE</span>
+              <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
             </div>
             {!isOnline && renderCapturedRow("w")}
           </div>
