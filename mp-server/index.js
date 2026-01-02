@@ -245,7 +245,7 @@ app.post("/api/games/:id/join", (req, res) => {
 
   game.tokens.black = newToken();
   game.status = "playing";
-  //startClockIfReady(game);
+  startClockIfReady(game);
 
   res.json({
     gameId: game.id,

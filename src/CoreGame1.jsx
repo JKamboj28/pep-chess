@@ -1644,12 +1644,15 @@ function App() {
           </div>
         </div>
 
+	const onlineWhiteMs = mpState?.whiteTimeMs ?? mpState?.clock?.whiteMs ?? START_TIME_MS;
+        const onlineBlackMs = mpState?.blackTimeMs ?? mpState?.clock?.blackMs ?? START_TIME_MS;
+
         <div className="side-panel">
           {/* Black clock + captured row */}
           <div className="clock-block">
             <div className={"clock" + (!isOnline && activeColor === "b" && !gameEnded ? " clock-active" : "")}>
               <span className="clock-label">BLACK</span>
-              <span className="clock-time">{formatTime(isOnline ? START_TIME_MS : blackTime)}</span>
+              <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
             </div>
             {!isOnline && renderCapturedRow("b")}
           </div>
@@ -1677,7 +1680,7 @@ function App() {
           <div className="clock-block">
             <div className={"clock" + (!isOnline && activeColor === "w" && !gameEnded ? " clock-active" : "")}>
               <span className="clock-label">WHITE</span>
-              <span className="clock-time">{formatTime(isOnline ? START_TIME_MS : whiteTime)}</span>
+              <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
             </div>
             {!isOnline && renderCapturedRow("w")}
           </div>
