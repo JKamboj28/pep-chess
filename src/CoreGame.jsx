@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { io } from "socket.io-client";
@@ -256,6 +256,38 @@ function App() {
   const emptyCaps = { p: 0, n: 0, b: 0, r: 0, q: 0 };
   const [capturedByWhite, setCapturedByWhite] = useState({ ...emptyCaps });
   const [capturedByBlack, setCapturedByBlack] = useState({ ...emptyCaps });
+
+// ---------------------------
+// Online captured pieces (derived from PGN)
+// ---------------------------
+const onlineCaptured = useMemo(() => {
+  const byWhite = { ...emptyCaps }; // white captured (black pieces)
+  const byBlack = { ...emptyCaps }; // black captured (white pieces)
+
+  if (!isOnline) return { byWhite, byBlack };
+
+  const pgn = mpState?.pgn || "";
+  if (!pgn.trim()) return { byWhite, byBlack };
+
+  try {
+    const tmp = new Chess();
+    if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
+    else if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
+
+    const hist = tmp.history({ verbose: true });
+    for (const m of hist) {
+      if (!m?.captured) continue;
+      const t = m.captured; // 'p','n','b','r','q'
+      if (byWhite[t] === undefined) continue;
+
+      if (m.color === "w") byWhite[t] += 1;
+      else if (m.color === "b") byBlack[t] += 1;
+    }
+  } catch {}
+
+  return { byWhite, byBlack };
+}, [isOnline, mpState?.pgn]);
+
 
   // ---------------------------
   // Multiplayer state (merged)
@@ -1365,7 +1397,7 @@ const blackClockActive = isOnline
     onPromotionChoiceOnline,
     () => setMpPendingPromotion(null)
   );
-
+  /*
   // ---------------------------
   // Captured row (local only)
   // ---------------------------
@@ -1399,7 +1431,52 @@ const blackClockActive = isOnline
         {score > 0 && <span className="captured-score">+{score}</span>}
       </div>
     );
-  };
+  };*/
+
+function renderCapturedRow(sideColor) {
+  const mine = isOnline
+    ? (sideColor === "w" ? onlineCaptured.byWhite : onlineCaptured.byBlack)
+    : (sideColor === "w" ? capturedByWhite : capturedByBlack);
+
+  const opp = isOnline
+    ? (sideColor === "w" ? onlineCaptured.byBlack : onlineCaptured.byWhite)
+    : (sideColor === "w" ? capturedByBlack : capturedByWhite);
+
+  // Captured pieces shown next to a side's clock are the OPPONENT's pieces.
+  // So: white clock shows black pieces captured by white -> iconColor 'b'
+  //     black clock shows white pieces captured by black -> iconColor 'w'
+  const iconColor = sideColor === "w" ? "b" : "w";
+
+  const myScore =
+    mine.q * 9 + mine.r * 5 + mine.b * 3 + mine.n * 3 + mine.p * 1;
+  const oppScore =
+    opp.q * 9 + opp.r * 5 + opp.b * 3 + opp.n * 3 + opp.p * 1;
+  const scoreDiff = myScore - oppScore;
+
+  const hasAny =
+    mine.q + mine.r + mine.b + mine.n + mine.p > 0 ||
+    opp.q + opp.r + opp.b + opp.n + opp.p > 0;
+
+  return (
+    <div className={"captured-row captured-row-" + sideColor}>
+      {CAPTURE_ORDER.flatMap((t) =>
+        Array.from({ length: mine[t] || 0 }).map((_, idx) => (
+          <img
+            key={`${sideColor}-${t}-${idx}`}
+            className="captured-piece"
+            src={pieceImagePaths[`${iconColor}${t.toUpperCase()}`]}
+            alt={t}
+          />
+        ))
+      )}
+
+      {!hasAny && <span className="captured-placeholder"> </span>}
+
+      {scoreDiff > 0 && <span className="material-diff">+{scoreDiff}</span>}
+    </div>
+  );
+}
+
 
   // ---------------------------
   // Local controls (draw/resign)
@@ -1749,7 +1826,8 @@ const copyInvite = async () => {
               <span className="clock-label">BLACK</span>
               <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
             </div>
-            {!isOnline && renderCapturedRow("b")}
+            {/*{!isOnline && renderCapturedRow("b")}*/}
+              {renderCapturedRow("b")}
           </div>
 
           {/* Moves table */}
@@ -1777,7 +1855,8 @@ const copyInvite = async () => {
               <span className="clock-label">WHITE</span>
               <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
             </div>
-            {!isOnline && renderCapturedRow("w")}
+              {renderCapturedRow("w")}
+            {/*{!isOnline && renderCapturedRow("w")}*/}
           </div>
 
           {/* Draw / resign controls */}
