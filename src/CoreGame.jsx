@@ -326,17 +326,6 @@ function App() {
 //   return { byWhite, byBlack };
 // }, [isOnline, mpState?.pgn]);
 
-const onlineCaptured = useMemo(() => {
-  if (!isOnline) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
-
-  const fen = mpState?.fen;
-  if (!fen) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
-
-  const { capByWhite, capByBlack } = capturedFromFen(fen);
-  return { byWhite: capByWhite, byBlack: capByBlack };
-}, [isOnline, mpState?.fen]);
-
-
   // ---------------------------
   // Multiplayer state (merged)
   // ---------------------------
@@ -434,6 +423,19 @@ const blackClockActive = isOnline
 //     : (moves.length > 0);
 
 // const canAbortPepMatch = pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
+
+// ---------------------------
+// Online captured pieces (derived from server FEN)
+// ---------------------------
+const onlineCaptured = useMemo(() => {
+  if (!isOnline) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
+
+  const fen = mpState?.fen;
+  if (!fen) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
+
+  const { capByWhite, capByBlack } = capturedFromFen(fen);
+  return { byWhite: capByWhite, byBlack: capByBlack };
+}, [isOnline, mpState?.fen]);
 
 const seat = (mpSeat ?? "").toLowerCase().trim();
 
