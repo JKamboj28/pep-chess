@@ -171,6 +171,36 @@ function formatPepError(raw, whiteAddr = "", blackAddr = "") {
   return "Something went wrong with the PEP match. Please check the addresses and try again.";
 }
 
+async function copyText(text) {
+  if (!text) return false;
+
+  // Works on HTTPS + localhost
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {}
+
+  // Fallback for HTTP
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    ta.style.top = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) {}
+
+  return false;
+}
+
+
 function shortMessage(raw, fallback = "") {
   let text =
     typeof raw === "string"
@@ -411,6 +441,16 @@ const blackClockActive = isOnline
   const [copiedWhiteEscrow, setCopiedWhiteEscrow] = useState(false);
   const [copiedBlackEscrow, setCopiedBlackEscrow] = useState(false);
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+    const ctrl = new AbortController();
+    const id = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: ctrl.signal });
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
 //   const canCreatePepMatch =
 //     (!isOnline || mpSeat === "white") &&
 //     (!pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error") &&
@@ -497,45 +537,6 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, []);
-
-  // ✅ Works on HTTP + HTTPS (fallback for non-secure contexts)
-  async function copyText(text) {
-    if (!text) return false;
-
-    // Secure context clipboard (https / localhost)
-    try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    } catch (e) {
-      // fall through to legacy copy
-    }
-
-    // Legacy fallback (works on http)
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.top = "-9999px";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
-
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-
-      if (!ok) throw new Error("execCommand copy failed");
-      return true;
-    } catch (e) {
-      // Last resort: show prompt so user can manually copy
-      window.prompt("Copy this:", text);
-      return false;
-    }
-  }
-
 
   // ---------------------------
   // Local helpers
@@ -1374,7 +1375,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         throw new Error("Both PEP addresses are required.");
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/matches`, {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/matches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1398,6 +1399,15 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
 
       setPepMatchId(matchId);
+
+      // Make the current URL include pep=<matchId> so the invite is shareable and
+      // the black side can load the match + see its escrow.
+      if (isOnline && matchId) {
+        const u = new URL(window.location.href);
+        u.searchParams.set("pep", String(matchId));
+        window.history.replaceState({}, "", u.toString());
+      }
+
       setPepWhiteEscrow(whiteEscrow);
       setPepBlackEscrow(blackEscrow);
       setPepWhiteDeposit(whiteDep);
@@ -1408,10 +1418,19 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       setPepConfirmedDeposits(0);
 
       setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+    // } catch (err) {
+    //   setPepMatchStatus("error");
+    //   const msg = err && err.message ? err.message : typeof err === "string" ? err : "";
+    //   setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
+    // }
     } catch (err) {
       setPepMatchStatus("error");
-      const msg = err && err.message ? err.message : typeof err === "string" ? err : "";
-      setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
+      if (err?.name === "AbortError") {
+        setPepError(`PEP API timed out. Check the server is reachable at ${API_BASE_URL}.`);
+      } else {
+        const msg = err?.message ? err.message : String(err || "");
+        setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
+      }
     }
   };
 
@@ -2132,12 +2151,10 @@ const copyInvite = async () => {
                     //   setTimeout(() => setCopiedWhiteEscrow(false), 1500);
                     // }}
                     onClick={async () => {
-                      if (!pepWhiteEscrow) return;
                       const ok = await copyText(pepWhiteEscrow);
-                      if (ok) {
-                        setCopiedWhiteEscrow(true);
-                        setTimeout(() => setCopiedWhiteEscrow(false), 1500);
-                      }
+                      if (!ok) return;
+                      setCopiedWhiteEscrow(true);
+                      setTimeout(() => setCopiedWhiteEscrow(false), 1500);
                     }}
                     disabled={!pepWhiteEscrow}
                   >
@@ -2163,12 +2180,10 @@ const copyInvite = async () => {
                     //   setTimeout(() => setCopiedBlackEscrow(false), 1500);
                     // }}
                     onClick={async () => {
-                      if (!pepBlackEscrow) return;
                       const ok = await copyText(pepBlackEscrow);
-                      if (ok) {
-                        setCopiedBlackEscrow(true);
-                        setTimeout(() => setCopiedBlackEscrow(false), 1500);
-                      }
+                      if (!ok) return;
+                      setCopiedBlackEscrow(true);
+                      setTimeout(() => setCopiedBlackEscrow(false), 1500);
                     }}
                     disabled={!pepBlackEscrow}
                   >
