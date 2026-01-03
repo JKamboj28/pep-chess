@@ -498,6 +498,45 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     return () => window.removeEventListener("resize", calc);
   }, []);
 
+  // ✅ Works on HTTP + HTTPS (fallback for non-secure contexts)
+  async function copyText(text) {
+    if (!text) return false;
+
+    // Secure context clipboard (https / localhost)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      // fall through to legacy copy
+    }
+
+    // Legacy fallback (works on http)
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "-9999px";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+
+      if (!ok) throw new Error("execCommand copy failed");
+      return true;
+    } catch (e) {
+      // Last resort: show prompt so user can manually copy
+      window.prompt("Copy this:", text);
+      return false;
+    }
+  }
+
+
   // ---------------------------
   // Local helpers
   // ---------------------------
@@ -1310,6 +1349,22 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setPepBlackExtraAmount(0);
     setPepMatchStatus("creating");
 
+    // ✅ IMPORTANT: update URL so the invite link includes pep=... (so black can see match/escrow/deposits)
+    if (matchId) {
+      try {
+        const url = new URL(window.location.href);
+
+        url.searchParams.set("pep", String(matchId));
+        url.searchParams.set("stake", String(stakeNum));
+        url.searchParams.set("wp", pepWhiteAddress.trim());
+        url.searchParams.set("bp", pepBlackAddress.trim());
+
+        window.history.replaceState({}, "", url.toString());
+      } catch (e) {
+        // ignore
+      }
+    }
+
     try {
       const stakeNum = parseFloat(pepStake);
       if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
@@ -2070,11 +2125,19 @@ const copyInvite = async () => {
                   <button
                     type="button"
                     className="pep-copy-btn"
-                    onClick={() => {
+                    // onClick={() => {
+                    //   if (!pepWhiteEscrow) return;
+                    //   navigator.clipboard.writeText(pepWhiteEscrow);
+                    //   setCopiedWhiteEscrow(true);
+                    //   setTimeout(() => setCopiedWhiteEscrow(false), 1500);
+                    // }}
+                    onClick={async () => {
                       if (!pepWhiteEscrow) return;
-                      navigator.clipboard.writeText(pepWhiteEscrow);
-                      setCopiedWhiteEscrow(true);
-                      setTimeout(() => setCopiedWhiteEscrow(false), 1500);
+                      const ok = await copyText(pepWhiteEscrow);
+                      if (ok) {
+                        setCopiedWhiteEscrow(true);
+                        setTimeout(() => setCopiedWhiteEscrow(false), 1500);
+                      }
                     }}
                     disabled={!pepWhiteEscrow}
                   >
@@ -2093,11 +2156,19 @@ const copyInvite = async () => {
                   <button
                     type="button"
                     className="pep-copy-btn"
-                    onClick={() => {
+                    // onClick={() => {
+                    //   if (!pepBlackEscrow) return;
+                    //   navigator.clipboard.writeText(pepBlackEscrow);
+                    //   setCopiedBlackEscrow(true);
+                    //   setTimeout(() => setCopiedBlackEscrow(false), 1500);
+                    // }}
+                    onClick={async () => {
                       if (!pepBlackEscrow) return;
-                      navigator.clipboard.writeText(pepBlackEscrow);
-                      setCopiedBlackEscrow(true);
-                      setTimeout(() => setCopiedBlackEscrow(false), 1500);
+                      const ok = await copyText(pepBlackEscrow);
+                      if (ok) {
+                        setCopiedBlackEscrow(true);
+                        setTimeout(() => setCopiedBlackEscrow(false), 1500);
+                      }
                     }}
                     disabled={!pepBlackEscrow}
                   >
