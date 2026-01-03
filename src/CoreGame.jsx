@@ -262,7 +262,7 @@ function App() {
   // ---------------------------
   // Mode: local vs online
   // ---------------------------
-  const [mode, setMode] = useState("local"); // "local" | "online"
+  const [mode, setMode] = useState("online"); // "local" | "online"
   const isOnline = mode === "online";
 
   // ---------------------------
@@ -298,33 +298,43 @@ function App() {
 // ---------------------------
 // Online captured pieces (derived from PGN)
 // ---------------------------
+// const onlineCaptured = useMemo(() => {
+//   const byWhite = { ...emptyCaps }; // white captured (black pieces)
+//   const byBlack = { ...emptyCaps }; // black captured (white pieces)
+
+//   if (!isOnline) return { byWhite, byBlack };
+
+//   const pgn = mpState?.pgn || "";
+//   if (!pgn.trim()) return { byWhite, byBlack };
+
+//   try {
+//     const tmp = new Chess();
+//     if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
+//     else if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
+
+//     const hist = tmp.history({ verbose: true });
+//     for (const m of hist) {
+//       if (!m?.captured) continue;
+//       const t = m.captured; // 'p','n','b','r','q'
+//       if (byWhite[t] === undefined) continue;
+
+//       if (m.color === "w") byWhite[t] += 1;
+//       else if (m.color === "b") byBlack[t] += 1;
+//     }
+//   } catch {}
+
+//   return { byWhite, byBlack };
+// }, [isOnline, mpState?.pgn]);
+
 const onlineCaptured = useMemo(() => {
-  const byWhite = { ...emptyCaps }; // white captured (black pieces)
-  const byBlack = { ...emptyCaps }; // black captured (white pieces)
+  if (!isOnline) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
 
-  if (!isOnline) return { byWhite, byBlack };
+  const fen = mpState?.fen;
+  if (!fen) return { byWhite: { ...emptyCaps }, byBlack: { ...emptyCaps } };
 
-  const pgn = mpState?.pgn || "";
-  if (!pgn.trim()) return { byWhite, byBlack };
-
-  try {
-    const tmp = new Chess();
-    if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
-    else if (typeof tmp.loadPgn === "function") tmp.loadPgn(pgn);
-
-    const hist = tmp.history({ verbose: true });
-    for (const m of hist) {
-      if (!m?.captured) continue;
-      const t = m.captured; // 'p','n','b','r','q'
-      if (byWhite[t] === undefined) continue;
-
-      if (m.color === "w") byWhite[t] += 1;
-      else if (m.color === "b") byBlack[t] += 1;
-    }
-  } catch {}
-
-  return { byWhite, byBlack };
-}, [isOnline, mpState?.pgn]);
+  const { capByWhite, capByBlack } = capturedFromFen(fen);
+  return { byWhite: capByWhite, byBlack: capByBlack };
+}, [isOnline, mpState?.fen]);
 
 
   // ---------------------------
@@ -412,28 +422,50 @@ const blackClockActive = isOnline
   const [copiedWhiteEscrow, setCopiedWhiteEscrow] = useState(false);
   const [copiedBlackEscrow, setCopiedBlackEscrow] = useState(false);
 
-//  const canCreatePepMatch =
- //   !pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error";
+//   const canCreatePepMatch =
+//     (!isOnline || mpSeat === "white") &&
+//     (!pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error") &&
+//     pepStake.trim() !== "" &&
+//     pepWhiteAddress.trim() !== "" &&
+//     pepBlackAddress.trim() !== "";
 
-  const canCreatePepMatch =
-    (!isOnline || mpSeat === "white") &&
-    (!pepMatchId || pepMatchStatus === "settled" || pepMatchStatus === "error") &&
-    pepStake.trim() !== "" &&
-    pepWhiteAddress.trim() !== "" &&
-    pepBlackAddress.trim() !== "";
+//   const hasAnyGameMove = isOnline
+//     ? ((mpState?.moves?.length ?? 0) > 0)
+//     : (moves.length > 0);
 
-  const hasAnyGameMove = isOnline
-    ? ((mpState?.moves?.length ?? 0) > 0)
-    : (moves.length > 0);
+// const canAbortPepMatch = pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
-const canAbortPepMatch = pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
+const seat = (mpSeat ?? "").toLowerCase().trim();
+
+const canCreatePepMatch =
+  !pepMatchId &&
+  !isPepMatchLocked &&
+  pepStake &&
+  pepWhiteAddress &&
+  pepBlackAddress &&
+  (!isOnline || seat === "white");
+
+// IMPORTANT: online "moves list" may not exist, so use status/ply/fen too.
+const hasAnyGameMove = isOnline
+  ? (mpState?.status === "playing" ||
+     (mpState?.ply ?? 0) > 0 ||
+     ((mpState?.pgn?.trim?.() ?? "") !== "") ||
+     (mpState?.moves?.length ?? 0) > 0)
+  : (moves.length > 0);
+
+const canAbortPepMatch = !!pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
+
+// Only show YOUR escrow address (spectators see none; change if you want spectators later)
+const showWhiteEscrow = !isOnline ? true : seat === "white";
+const showBlackEscrow = !isOnline ? true : seat === "black";
+
 
   const stakeNumber = parseFloat(pepStake) || 0;
   const whiteDepositOk = stakeNumber > 0 && pepWhiteDeposit >= stakeNumber;
   const blackDepositOk = stakeNumber > 0 && pepBlackDeposit >= stakeNumber;
   const confirmedDeposits = (whiteDepositOk ? 1 : 0) + (blackDepositOk ? 1 : 0);
-  const showWhiteEscrow = !isOnline ? true : mpSeat === "white";
-  const showBlackEscrow = !isOnline ? true : mpSeat === "black";
+  // const showWhiteEscrow = !isOnline ? true : mpSeat === "white";
+  // const showBlackEscrow = !isOnline ? true : mpSeat === "black";
 
   // fixed board width
   const [boardWidth, setBoardWidth] = useState(680);
@@ -994,7 +1026,7 @@ const canAbortPepMatch = pepMatchId && !hasAnyGameMove && (pepMatchStatus === "w
     setMpCheckSquare(null);
     setMpMoveRows([]);
 
-    setMode("local");
+    setMode("online");
   }
 
   // keep socket connected on mpGameId/mpToken
@@ -1714,14 +1746,14 @@ const copyInvite = async () => {
           padding: "0 0 14px 0",
         }}
       >
-        <button
+        {/* <button
           className="control-btn"
           onClick={() => setMode("local")}
           disabled={!isOnline}
           title="Local mode"
         >
           Local
-        </button>
+        </button> */}
 
         <button
           className="control-btn"
@@ -2013,13 +2045,19 @@ const copyInvite = async () => {
               {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
             </button>
 
-            <button
+            {/* <button
               className="pep-button pep-button-abort"
               onClick={abortPepMatch}
               disabled={!canAbortPepMatch}
             >
               Abort match & refund
-            </button>
+            </button> */}
+
+            {canAbortPepMatch && (
+              <button className="btn abort-btn" onClick={abortPepMatch}>
+                Abort match & refund
+              </button>
+            )}
 
             {/* Escrow addresses (with copy buttons) */}
             {showWhiteEscrow && (
@@ -2089,7 +2127,7 @@ const copyInvite = async () => {
               </span>
             </div>
 
-            <div className="pep-status-line">Deposits: {pepConfirmedDeposits} / 2 confirmed</div>
+            <div className="pep-status-line">Deposits: {confirmedDeposits} / 2 confirmed</div>
 
             <div className="pep-deposit-status">
               <span className={"pep-deposit-inline" + (whiteDepositOk ? " pep-deposit-ok" : "")}>
