@@ -1301,138 +1301,138 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     ? ((mpState?.moves?.length || 0) > 0)
     : (moves.length > 0);
 
-  const createPepMatch = async () => {
-    if (pepMatchStatus === "creating") return;
+const createPepMatch = async () => {
+  // prevent double-click spam
+  if (pepMatchStatus === "creating") return;
 
-    // 2-click confirmation if a game has moves (local OR online)
-    if (!pepPendingResetConfirm && anyMovesForConfirm) {
-      setPepPendingResetConfirm(true);
-      setPepError("");
-      setPepInfoMessage("PEP match will be linked to this game – click 'Create PEP match' again to confirm.");
-      return;
-    }
+  // If you want ONLY white to be able to create the match in online mode:
+  // (remove this if you want either side to create it)
+  if (isOnline && seat !== "white") {
+    setPepError("Only White can create the PEP match (send the invite link to Black).");
+    return;
+  }
 
-    const whiteValid = isProbablyPepAddress(pepWhiteAddress);
-    const blackValid = isProbablyPepAddress(pepBlackAddress);
-
-    if (!whiteValid || !blackValid) {
-      setPepMatchStatus("error");
-      setPepInfoMessage("");
-
-      if (!whiteValid && !blackValid) {
-        setPepError("White and Black PEP addresses look invalid – please check both.");
-      } else if (!whiteValid) {
-        setPepError("White PEP address looks invalid – please check and try again.");
-      } else {
-        setPepError("Black PEP address looks invalid – please check and try again.");
-      }
-      return;
-    }
-
-    setPepPendingResetConfirm(false);
-
-    // IMPORTANT:
-    // - If local: reset board to start when creating a PEP match (existing behaviour)
-    // - If online: do NOT reset locally (server owns the board). The match is linked via invite URL (?pep=...)
-    if (!isOnline) {
-      resetBoardOnlyLocal();
-    }
-
+  // 2-click confirmation if game already has moves
+  if (!pepPendingResetConfirm && anyMovesForConfirm) {
+    setPepPendingResetConfirm(true);
     setPepError("");
+    setPepInfoMessage(
+      "PEP match will be linked to this game – click 'Create PEP match' again to confirm."
+    );
+    return;
+  }
+
+  const whiteValid = isProbablyPepAddress(pepWhiteAddress);
+  const blackValid = isProbablyPepAddress(pepBlackAddress);
+
+  if (!whiteValid || !blackValid) {
+    setPepMatchStatus("error");
     setPepInfoMessage("");
-    setPepResultSent(false);
-    setPepConfirmedDeposits(0);
-    setPepWhiteDeposit(0);
-    setPepBlackDeposit(0);
-    setPepWhiteExtraRefunded(false);
-    setPepWhiteExtraAmount(0);
-    setPepBlackExtraRefunded(false);
-    setPepBlackExtraAmount(0);
-    setPepMatchStatus("creating");
 
-    // ✅ IMPORTANT: update URL so the invite link includes pep=... (so black can see match/escrow/deposits)
-    if (matchId) {
-      try {
-        const url = new URL(window.location.href);
+    if (!whiteValid && !blackValid) {
+      setPepError("White and Black PEP addresses look invalid – please check both.");
+    } else if (!whiteValid) {
+      setPepError("White PEP address looks invalid – please check and try again.");
+    } else {
+      setPepError("Black PEP address looks invalid – please check and try again.");
+    }
+    return;
+  }
 
-        url.searchParams.set("pep", String(matchId));
-        url.searchParams.set("stake", String(stakeNum));
-        url.searchParams.set("wp", pepWhiteAddress.trim());
-        url.searchParams.set("bp", pepBlackAddress.trim());
+  // reset the 2-click confirm flag
+  setPepPendingResetConfirm(false);
 
-        window.history.replaceState({}, "", url.toString());
-      } catch (e) {
-        // ignore
-      }
+  // IMPORTANT:
+  // - If local: you can reset the board when creating a match
+  // - If online: DO NOT reset locally (server owns the game)
+  if (!isOnline) {
+    resetBoardOnlyLocal();
+  }
+
+  // clear UI + set creating
+  setPepError("");
+  setPepInfoMessage("");
+  setPepResultSent(false);
+  setPepConfirmedDeposits(0);
+  setPepWhiteDeposit(0);
+  setPepBlackDeposit(0);
+  setPepWhiteExtraRefunded(false);
+  setPepWhiteExtraAmount(0);
+  setPepBlackExtraRefunded(false);
+  setPepBlackExtraAmount(0);
+  setPepMatchStatus("creating");
+
+  try {
+    const stakeNum = Number(pepStake);
+    if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
+      throw new Error("Stake must be a positive number.");
     }
 
-    try {
-      const stakeNum = parseFloat(pepStake);
-      if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
-        throw new Error("Stake must be a positive number.");
-      }
-      if (!pepWhiteAddress.trim() || !pepBlackAddress.trim()) {
-        throw new Error("Both PEP addresses are required.");
-      }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
 
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/matches`, {
+    let res;
+    try {
+      res = await fetch(`${API_BASE_URL}/api/matches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           stake: stakeNum,
           white_address: pepWhiteAddress.trim(),
           black_address: pepBlackAddress.trim(),
         }),
       });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Failed to create match.");
-      }
-
-      const data = await res.json();
-
-      const matchId = data.matchId ?? data.id;
-      const whiteEscrow = data.whiteEscrow ?? data.white_escrow ?? "";
-      const blackEscrow = data.blackEscrow ?? data.black_escrow ?? "";
-      const whiteDep = data.whiteDeposit ?? data.white_deposit ?? 0;
-      const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
-
-      setPepMatchId(matchId);
-
-      // Make the current URL include pep=<matchId> so the invite is shareable and
-      // the black side can load the match + see its escrow.
-      if (isOnline && matchId) {
-        const u = new URL(window.location.href);
-        u.searchParams.set("pep", String(matchId));
-        window.history.replaceState({}, "", u.toString());
-      }
-
-      setPepWhiteEscrow(whiteEscrow);
-      setPepBlackEscrow(blackEscrow);
-      setPepWhiteDeposit(whiteDep);
-      setPepBlackDeposit(blackDep);
-
-      setPepEscrowAddress("");
-      setPepMatchStatus(data.status || "waiting_for_deposits");
-      setPepConfirmedDeposits(0);
-
-      setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
-    // } catch (err) {
-    //   setPepMatchStatus("error");
-    //   const msg = err && err.message ? err.message : typeof err === "string" ? err : "";
-    //   setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
-    // }
-    } catch (err) {
-      setPepMatchStatus("error");
-      if (err?.name === "AbortError") {
-        setPepError(`PEP API timed out. Check the server is reachable at ${API_BASE_URL}.`);
-      } else {
-        const msg = err?.message ? err.message : String(err || "");
-        setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
-      }
+    } finally {
+      clearTimeout(t);
     }
-  };
+
+    const raw = await res.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      // keep data {}
+    }
+
+    if (!res.ok) {
+      throw new Error(data?.detail || raw || "Failed to create match.");
+    }
+
+    const matchId = data.matchId ?? data.id ?? "";
+    const whiteEscrow = data.whiteEscrow ?? data.white_escrow ?? "";
+    const blackEscrow = data.blackEscrow ?? data.black_escrow ?? "";
+    const whiteDep = data.whiteDeposit ?? data.white_deposit ?? 0;
+    const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
+
+    if (!matchId) throw new Error("Backend did not return a match id.");
+
+    setPepMatchId(matchId);
+    setPepWhiteEscrow(whiteEscrow);
+    setPepBlackEscrow(blackEscrow);
+    setPepWhiteDeposit(whiteDep);
+    setPepBlackDeposit(blackDep);
+
+    setPepMatchStatus(data.status || "waiting_for_deposits");
+    setPepConfirmedDeposits(0);
+
+    setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+
+    // ✅ THIS is the correct place to update the URL (AFTER matchId exists)
+    // so Black loads the same match + addresses automatically.
+    const params = new URLSearchParams(window.location.search);
+    params.set("pep", matchId);
+    params.set("stake", String(stakeNum));
+    params.set("wp", pepWhiteAddress.trim());
+    params.set("bp", pepBlackAddress.trim());
+    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+  } catch (err) {
+    setPepMatchStatus("error");
+    const msg =
+      err && err.message ? err.message : typeof err === "string" ? err : "Unknown error";
+    setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
+  }
+};
 
   const abortPepMatch = async () => {
     if (!pepMatchId) return;
