@@ -488,10 +488,9 @@ const canCreatePepMatch =
   pepBlackAddress &&
   (!isOnline || seat === "white" || seat === "black");
 
-// IMPORTANT: online "moves list" may not exist, so use status/ply/fen too.
+// Check if any actual moves have been made (not just game status)
 const hasAnyGameMove = isOnline
-  ? (mpState?.status === "playing" ||
-     (mpState?.ply ?? 0) > 0 ||
+  ? ((mpState?.ply ?? 0) > 0 ||
      ((mpState?.pgn?.trim?.() ?? "") !== "") ||
      (mpState?.moves?.length ?? 0) > 0)
   : (moves.length > 0);
