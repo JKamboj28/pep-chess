@@ -1136,8 +1136,9 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     // moves rows from pgn
     setMpMoveRows(pgnToRows(mpState.pgn || ""));
 
-    // if game ended and PEP active, report
-    if (pepMatchId && !pepResultSent && mpState.status === "ended") {
+    // if game ended and PEP active, report result
+    // IMPORTANT: Only WHITE reports the result to avoid double payment (race condition)
+    if (pepMatchId && !pepResultSent && mpState.status === "ended" && mpSeat === "white") {
       const r = mpState.result;
       if (r === "1-0") reportPepResult("white", mpState.pgn || "", mpState.fen || "");
       else if (r === "0-1") reportPepResult("black", mpState.pgn || "", mpState.fen || "");
