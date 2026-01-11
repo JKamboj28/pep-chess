@@ -1302,110 +1302,99 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     : (moves.length > 0);
 
 const createPepMatch = async () => {
-  // prevent double-click spam
   if (pepMatchStatus === "creating") return;
 
-  // If you want ONLY white to be able to create the match in online mode:
-  // (remove this if you want either side to create it)
-  if (isOnline && seat !== "white") {
-    setPepError("Only White can create the PEP match (send the invite link to Black).");
-    return;
-  }
-
-  // 2-click confirmation if game already has moves
-  if (!pepPendingResetConfirm && anyMovesForConfirm) {
-    setPepPendingResetConfirm(true);
-    setPepError("");
-    setPepInfoMessage(
-      "PEP match will be linked to this game – click 'Create PEP match' again to confirm."
-    );
-    return;
-  }
-
-  const whiteValid = isProbablyPepAddress(pepWhiteAddress);
-  const blackValid = isProbablyPepAddress(pepBlackAddress);
-
-  if (!whiteValid || !blackValid) {
-    setPepMatchStatus("error");
-    setPepInfoMessage("");
-
-    if (!whiteValid && !blackValid) {
-      setPepError("White and Black PEP addresses look invalid – please check both.");
-    } else if (!whiteValid) {
-      setPepError("White PEP address looks invalid – please check and try again.");
-    } else {
-      setPepError("Black PEP address looks invalid – please check and try again.");
-    }
-    return;
-  }
-
-  // reset the 2-click confirm flag
-  setPepPendingResetConfirm(false);
-
-  // IMPORTANT:
-  // - If local: you can reset the board when creating a match
-  // - If online: DO NOT reset locally (server owns the game)
-  if (!isOnline) {
-    resetBoardOnlyLocal();
-  }
-
-  // clear UI + set creating
-  setPepError("");
-  setPepInfoMessage("");
-  setPepResultSent(false);
-  setPepConfirmedDeposits(0);
-  setPepWhiteDeposit(0);
-  setPepBlackDeposit(0);
-  setPepWhiteExtraRefunded(false);
-  setPepWhiteExtraAmount(0);
-  setPepBlackExtraRefunded(false);
-  setPepBlackExtraAmount(0);
-  setPepMatchStatus("creating");
-
   try {
-    const stakeNum = Number(pepStake);
+    // 2-click confirmation if a game already has moves (local OR online)
+    if (!pepPendingResetConfirm && anyMovesForConfirm) {
+      setPepPendingResetConfirm(true);
+      setPepError("");
+      setPepInfoMessage(
+        "PEP match will be linked to this game – click 'Create PEP match' again to confirm."
+      );
+      return;
+    }
+
+    const whiteAddr = (pepWhiteAddress || "").trim();
+    const blackAddr = (pepBlackAddress || "").trim();
+
+    const whiteValid = isProbablyPepAddress(whiteAddr);
+    const blackValid = isProbablyPepAddress(blackAddr);
+
+    if (!whiteValid || !blackValid) {
+      setPepMatchStatus("error");
+      setPepInfoMessage("");
+
+      if (!whiteValid && !blackValid) {
+        setPepError("White and Black PEP addresses look invalid – please check both.");
+      } else if (!whiteValid) {
+        setPepError("White PEP address looks invalid – please check and try again.");
+      } else {
+        setPepError("Black PEP address looks invalid – please check and try again.");
+      }
+      return;
+    }
+
+    // IMPORTANT:
+    // - If local: reset board to start when creating a PEP match (existing behaviour)
+    // - If online: do NOT reset locally (server owns the board)
+    if (!isOnline) resetBoardOnlyLocal();
+
+    setPepPendingResetConfirm(false);
+
+    setPepError("");
+    setPepInfoMessage("");
+    setPepResultSent(false);
+    setPepConfirmedDeposits(0);
+    setPepWhiteDeposit(0);
+    setPepBlackDeposit(0);
+    setPepWhiteExtraRefunded(false);
+    setPepWhiteExtraAmount(0);
+    setPepBlackExtraRefunded(false);
+    setPepBlackExtraAmount(0);
+
+    setPepMatchStatus("creating");
+
+    const stakeNum = parseFloat(pepStake);
     if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
       throw new Error("Stake must be a positive number.");
     }
 
+    // ---- POST /api/matches with a hard timeout so UI never hangs forever ----
     const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 15000);
+    const timeoutId = setTimeout(() => ctrl.abort(), 20000);
 
-    let res;
-    try {
-      res = await fetch(`${API_BASE_URL}/api/matches`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: ctrl.signal,
-        body: JSON.stringify({
-          stake: stakeNum,
-          white_address: pepWhiteAddress.trim(),
-          black_address: pepBlackAddress.trim(),
-        }),
-      });
-    } finally {
-      clearTimeout(t);
-    }
+    const res = await fetch(`${API_BASE_URL}/api/matches`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        stake: stakeNum,
+        white_address: whiteAddr,
+        black_address: blackAddr,
+      }),
+    }).finally(() => clearTimeout(timeoutId));
 
     const raw = await res.text();
     let data = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
-      // keep data {}
+      // If the server returns non-JSON, surface it
+      throw new Error(raw || "Failed to create match (non-JSON response).");
     }
 
     if (!res.ok) {
-      throw new Error(data?.detail || raw || "Failed to create match.");
+      throw new Error(data?.error || raw || "Failed to create match.");
     }
 
-    const matchId = data.matchId ?? data.id ?? "";
+    const matchId = data.matchId ?? data.id;
+    if (!matchId) throw new Error("API did not return matchId.");
+
     const whiteEscrow = data.whiteEscrow ?? data.white_escrow ?? "";
     const blackEscrow = data.blackEscrow ?? data.black_escrow ?? "";
     const whiteDep = data.whiteDeposit ?? data.white_deposit ?? 0;
     const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
-
-    if (!matchId) throw new Error("Backend did not return a match id.");
 
     setPepMatchId(matchId);
     setPepWhiteEscrow(whiteEscrow);
@@ -1413,26 +1402,34 @@ const createPepMatch = async () => {
     setPepWhiteDeposit(whiteDep);
     setPepBlackDeposit(blackDep);
 
+    setPepEscrowAddress("");
     setPepMatchStatus(data.status || "waiting_for_deposits");
     setPepConfirmedDeposits(0);
 
-    setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+    // ✅ Update the URL ONLY AFTER matchId exists
+    // This is what makes Black load the same escrow when they open the link
+    const url = new URL(window.location.href);
+    url.searchParams.set("pep", String(matchId));
+    url.searchParams.set("stake", String(stakeNum));
+    url.searchParams.set("wp", whiteAddr);
+    url.searchParams.set("bp", blackAddr);
+    window.history.replaceState({}, "", url.toString());
 
-    // ✅ THIS is the correct place to update the URL (AFTER matchId exists)
-    // so Black loads the same match + addresses automatically.
-    const params = new URLSearchParams(window.location.search);
-    params.set("pep", matchId);
-    params.set("stake", String(stakeNum));
-    params.set("wp", pepWhiteAddress.trim());
-    params.set("bp", pepBlackAddress.trim());
-    window.history.replaceState({}, "", `${window.location.pathname}?${params.toString()}`);
+    setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
   } catch (err) {
     setPepMatchStatus("error");
+
     const msg =
-      err && err.message ? err.message : typeof err === "string" ? err : "Unknown error";
+      err?.name === "AbortError"
+        ? "Timed out creating match (API did not respond)."
+        : err?.message
+        ? err.message
+        : String(err);
+
     setPepError(formatPepError(msg, pepWhiteAddress, pepBlackAddress));
   }
 };
+
 
   const abortPepMatch = async () => {
     if (!pepMatchId) return;
