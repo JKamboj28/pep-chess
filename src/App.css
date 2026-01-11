@@ -280,6 +280,8 @@ body {
   height: 16px;
   margin: 0;
   vertical-align: middle;
+  /* Add glow/shadow to make dark pieces visible on dark background */
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
 }
 
 .material-score {

@@ -2031,24 +2031,39 @@ const copyInvite = async () => {
         </div>
 
         <div className="side-panel">
-          {/* Black clock + captured row */}
+          {/* Top clock - opponent's clock (Black for White player, White for Black player) */}
           <div className="clock-block">
-            <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
-              <span className="clock-label">
-                BLACK
-                {isOnline && mpState?.players?.black && (
-                  <span className={mpState.players.black.connected ? "player-online" : "player-offline"}>
-                    {mpState.players.black.connected ? " (online)" : " (offline)"}
-                  </span>
-                )}
-                {isOnline && !mpState?.players?.black && (
-                  <span className="player-waiting"> (waiting)</span>
-                )}
-              </span>
-              <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
-            </div>
-            {/*{!isOnline && renderCapturedRow("b")}*/}
-              {renderCapturedRow("b")}
+            {(isOnline && seat === "black") ? (
+              // Black player sees White clock at top
+              <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
+                <span className="clock-label">
+                  WHITE
+                  {mpState?.players?.white && (
+                    <span className={mpState.players.white.connected ? "player-online" : "player-offline"}>
+                      {mpState.players.white.connected ? " (online)" : " (offline)"}
+                    </span>
+                  )}
+                </span>
+                <span className="clock-time">{formatTime(onlineWhiteMs)}</span>
+              </div>
+            ) : (
+              // White player (or local) sees Black clock at top
+              <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
+                <span className="clock-label">
+                  BLACK
+                  {isOnline && mpState?.players?.black && (
+                    <span className={mpState.players.black.connected ? "player-online" : "player-offline"}>
+                      {mpState.players.black.connected ? " (online)" : " (offline)"}
+                    </span>
+                  )}
+                  {isOnline && !mpState?.players?.black && (
+                    <span className="player-waiting"> (waiting)</span>
+                  )}
+                </span>
+                <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
+              </div>
+            )}
+            {renderCapturedRow((isOnline && seat === "black") ? "w" : "b")}
           </div>
 
           {/* Moves table */}
@@ -2070,21 +2085,36 @@ const copyInvite = async () => {
             </div>
           </div>
 
-          {/* White clock + captured row */}
+          {/* Bottom clock - player's own clock */}
           <div className="clock-block">
-            <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
-              <span className="clock-label">
-                WHITE
-                {isOnline && mpState?.players?.white && (
-                  <span className={mpState.players.white.connected ? "player-online" : "player-offline"}>
-                    {mpState.players.white.connected ? " (online)" : " (offline)"}
-                  </span>
-                )}
-              </span>
-              <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
-            </div>
-              {renderCapturedRow("w")}
-            {/*{!isOnline && renderCapturedRow("w")}*/}
+            {(isOnline && seat === "black") ? (
+              // Black player sees their clock at bottom
+              <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
+                <span className="clock-label">
+                  BLACK
+                  {mpState?.players?.black && (
+                    <span className={mpState.players.black.connected ? "player-online" : "player-offline"}>
+                      {mpState.players.black.connected ? " (online)" : " (offline)"}
+                    </span>
+                  )}
+                </span>
+                <span className="clock-time">{formatTime(onlineBlackMs)}</span>
+              </div>
+            ) : (
+              // White player (or local) sees White clock at bottom
+              <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
+                <span className="clock-label">
+                  WHITE
+                  {isOnline && mpState?.players?.white && (
+                    <span className={mpState.players.white.connected ? "player-online" : "player-offline"}>
+                      {mpState.players.white.connected ? " (online)" : " (offline)"}
+                    </span>
+                  )}
+                </span>
+                <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
+              </div>
+            )}
+            {renderCapturedRow((isOnline && seat === "black") ? "b" : "w")}
           </div>
 
           {/* Draw / resign controls */}
@@ -2122,13 +2152,24 @@ const copyInvite = async () => {
                 >
                   {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
                 </button>
-                <button
-                  className="control-btn control-btn-resign"
-                  onClick={mpResign}
-                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
-                >
-                  Resign
-                </button>
+                {/* Show Abort & refund before first move if PEP match active, otherwise Resign */}
+                {!hasAnyGameMove && pepMatchId && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play") ? (
+                  <button
+                    className="control-btn control-btn-resign"
+                    onClick={abortPepMatch}
+                    disabled={!mpIsPlayer}
+                  >
+                    Abort & refund
+                  </button>
+                ) : (
+                  <button
+                    className="control-btn control-btn-resign"
+                    onClick={mpResign}
+                    disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                  >
+                    Resign
+                  </button>
+                )}
               </>
             )}
           </div>
