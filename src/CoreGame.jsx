@@ -2033,7 +2033,17 @@ const copyInvite = async () => {
           {/* Black clock + captured row */}
           <div className="clock-block">
             <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
-              <span className="clock-label">BLACK</span>
+              <span className="clock-label">
+                BLACK
+                {isOnline && mpState?.players?.black && (
+                  <span className={mpState.players.black.connected ? "player-online" : "player-offline"}>
+                    {mpState.players.black.connected ? " (online)" : " (offline)"}
+                  </span>
+                )}
+                {isOnline && !mpState?.players?.black && (
+                  <span className="player-waiting"> (waiting)</span>
+                )}
+              </span>
               <span className="clock-time">{formatTime(isOnline ? onlineBlackMs : blackTime)}</span>
             </div>
             {/*{!isOnline && renderCapturedRow("b")}*/}
@@ -2062,7 +2072,14 @@ const copyInvite = async () => {
           {/* White clock + captured row */}
           <div className="clock-block">
             <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
-              <span className="clock-label">WHITE</span>
+              <span className="clock-label">
+                WHITE
+                {isOnline && mpState?.players?.white && (
+                  <span className={mpState.players.white.connected ? "player-online" : "player-offline"}>
+                    {mpState.players.white.connected ? " (online)" : " (offline)"}
+                  </span>
+                )}
+              </span>
               <span className="clock-time">{formatTime(isOnline ? onlineWhiteMs : whiteTime)}</span>
             </div>
               {renderCapturedRow("w")}

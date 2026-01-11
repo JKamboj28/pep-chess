@@ -298,6 +298,32 @@ body {
   color: #111827;
 }
 
+/* Player online status */
+.player-online {
+  color: #22c55e;
+  font-size: 0.75em;
+  font-weight: normal;
+}
+
+.player-offline {
+  color: #ef4444;
+  font-size: 0.75em;
+  font-weight: normal;
+}
+
+.player-waiting {
+  color: #facc15;
+  font-size: 0.75em;
+  font-weight: normal;
+}
+
+.clock-active .player-online,
+.clock-active .player-offline,
+.clock-active .player-waiting {
+  color: inherit;
+  opacity: 0.7;
+}
+
 /* Move list */
 
 .moves-panel {
