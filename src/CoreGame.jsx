@@ -479,13 +479,14 @@ const onlineCaptured = useMemo(() => {
 
 const seat = (mpSeat ?? "").toLowerCase().trim();
 
+// Allow any player (white or black) to create PEP match - not just white
 const canCreatePepMatch =
   !pepMatchId &&
   !isPepMatchLocked &&
   pepStake &&
   pepWhiteAddress &&
   pepBlackAddress &&
-  (!isOnline || seat === "white");
+  (!isOnline || seat === "white" || seat === "black");
 
 // IMPORTANT: online "moves list" may not exist, so use status/ply/fen too.
 const hasAnyGameMove = isOnline
@@ -497,9 +498,9 @@ const hasAnyGameMove = isOnline
 
 const canAbortPepMatch = !!pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
-// Only show YOUR escrow address (spectators see none; change if you want spectators later)
-const showWhiteEscrow = !isOnline ? true : seat === "white";
-const showBlackEscrow = !isOnline ? true : seat === "black";
+// Show both escrow addresses to both players (but not spectators)
+const showWhiteEscrow = !isOnline ? true : (seat === "white" || seat === "black");
+const showBlackEscrow = !isOnline ? true : (seat === "white" || seat === "black");
 
 
   const stakeNumber = parseFloat(pepStake) || 0;
@@ -1130,6 +1131,27 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, mpState?.fen, mpState?.pgn, mpState?.status, mpState?.result]);
 
+  // Sync PEP data from socket state (mp-server broadcasts pep data to both players)
+  useEffect(() => {
+    if (!isOnline) return;
+    if (!mpState?.pep) return;
+
+    const pep = mpState.pep;
+
+    // Only sync if there's actual PEP data from the server
+    if (pep.matchId) {
+      setPepMatchId(pep.matchId);
+      setPepMatchStatus(pep.status || "waiting_for_deposits");
+    }
+    if (pep.whiteEscrow) setPepWhiteEscrow(pep.whiteEscrow);
+    if (pep.blackEscrow) setPepBlackEscrow(pep.blackEscrow);
+    if (pep.stake) setPepStake(String(pep.stake));
+    if (pep.whiteAddress) setPepWhiteAddress(pep.whiteAddress);
+    if (pep.blackAddress) setPepBlackAddress(pep.blackAddress);
+    if (pep.error) setPepError(pep.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, mpState?.pep?.matchId, mpState?.pep?.whiteEscrow, mpState?.pep?.blackEscrow, mpState?.pep?.status]);
+
   // auto-load session + query params (?game=...&pep=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1359,22 +1381,37 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         throw new Error("Stake must be a positive number.");
       }
 
-      // ---- POST /api/matches with a hard timeout so UI never hangs forever ----
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 20000);
 
       let res;
       try {
-        res = await fetch(`${API_BASE_URL}/api/matches`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: ctrl.signal,
-          body: JSON.stringify({
-            stake: stakeNum,
-            white_address: whiteAddr,
-            black_address: blackAddr,
-          }),
-        });
+        if (isOnline && mpGameId && mpToken) {
+          // ONLINE: Use mp-server endpoint so both players get synced via socket
+          res = await fetch(`${MP_URL}/api/games/${mpGameId}/pep/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
+            body: JSON.stringify({
+              token: mpToken,
+              stake: stakeNum,
+              whiteAddress: whiteAddr,
+              blackAddress: blackAddr,
+            }),
+          });
+        } else {
+          // LOCAL: Use Python API directly
+          res = await fetch(`${API_BASE_URL}/api/matches`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
+            body: JSON.stringify({
+              stake: stakeNum,
+              white_address: whiteAddr,
+              black_address: blackAddr,
+            }),
+          });
+        }
       } finally {
         clearTimeout(timeoutId);
       }
@@ -1391,33 +1428,33 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         throw new Error(data?.error || raw || "Failed to create match.");
       }
 
-      const newMatchId = data.matchId ?? data.id;
-      if (!newMatchId) throw new Error("API did not return matchId.");
+      if (isOnline) {
+        // Online: PEP state will be synced via socket broadcast from mp-server
+        // Just show success message - useEffect will handle state updates
+        setPepMatchStatus("waiting_for_deposits");
+        setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+      } else {
+        // Local: Update state directly
+        const newMatchId = data.matchId ?? data.id;
+        if (!newMatchId) throw new Error("API did not return matchId.");
 
-      const whiteEscrow = data.whiteEscrow ?? data.white_escrow ?? "";
-      const blackEscrow = data.blackEscrow ?? data.black_escrow ?? "";
-      const whiteDep = data.whiteDeposit ?? data.white_deposit ?? 0;
-      const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
+        const whiteEscrow = data.whiteEscrow ?? data.white_escrow ?? "";
+        const blackEscrow = data.blackEscrow ?? data.black_escrow ?? "";
+        const whiteDep = data.whiteDeposit ?? data.white_deposit ?? 0;
+        const blackDep = data.blackDeposit ?? data.black_deposit ?? 0;
 
-      setPepMatchId(newMatchId);
-      setPepWhiteEscrow(whiteEscrow);
-      setPepBlackEscrow(blackEscrow);
-      setPepWhiteDeposit(whiteDep);
-      setPepBlackDeposit(blackDep);
+        setPepMatchId(newMatchId);
+        setPepWhiteEscrow(whiteEscrow);
+        setPepBlackEscrow(blackEscrow);
+        setPepWhiteDeposit(whiteDep);
+        setPepBlackDeposit(blackDep);
 
-      setPepEscrowAddress("");
-      setPepMatchStatus(data.status || "waiting_for_deposits");
-      setPepConfirmedDeposits(0);
+        setPepEscrowAddress("");
+        setPepMatchStatus(data.status || "waiting_for_deposits");
+        setPepConfirmedDeposits(0);
 
-      // Update the URL ONLY AFTER newMatchId exists
-      const url = new URL(window.location.href);
-      url.searchParams.set("pep", String(newMatchId));
-      url.searchParams.set("stake", String(stakeNum));
-      url.searchParams.set("wp", whiteAddr);
-      url.searchParams.set("bp", blackAddr);
-      window.history.replaceState({}, "", url.toString());
-
-      setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+        setPepInfoMessage("Match created – send stakes to each escrow address and wait for both deposits.");
+      }
     } catch (err) {
       setPepMatchStatus("error");
 
@@ -1755,19 +1792,18 @@ function renderCapturedRow(sideColor) {
 
   // Invite link:
   // - Always include ?game=<mpGameId>
-  // - If PEP match exists, include &pep=<pepMatchId> so the joiner loads the same escrow
+  // - Include stake + white address so Black can see them when joining
+  // - Black will create the PEP match after entering their address
 
 // near the top of CoreGame component with other hooks
 const [inviteCopied, setInviteCopied] = useState(false);
 
-// later, where you currently build inviteUrl
+// Build invite URL with stake and white address (Black will create the match)
 const inviteUrl =
   isOnline && mpGameId
     ? `${window.location.origin}/?game=${mpGameId}` +
-      (pepMatchId ? `&pep=${encodeURIComponent(pepMatchId)}` : "") +
       (pepStake ? `&stake=${encodeURIComponent(pepStake)}` : "") +
-      (pepWhiteAddress ? `&wp=${encodeURIComponent(pepWhiteAddress)}` : "") +
-      (pepBlackAddress ? `&bp=${encodeURIComponent(pepBlackAddress)}` : "")
+      (pepWhiteAddress ? `&wp=${encodeURIComponent(pepWhiteAddress)}` : "")
     : "";
 
 const copyInvite = async () => {
@@ -2253,12 +2289,6 @@ const copyInvite = async () => {
             {pepInfoMessage && <div className="pep-info">{shortMessage(pepInfoMessage)}</div>}
             {pepError && <div className="pep-error">{shortMessage(pepError, "PEP match error.")}</div>}
 
-            {isOnline && inviteUrl && (
-              <div style={{ marginTop: 10, fontSize: 12, opacity: 0.85 }}>
-                Share this invite to link the same escrow + game:
-                <div style={{ fontFamily: "monospace", marginTop: 6 }}>{inviteUrl}</div>
-              </div>
-            )}
           </div>
         </div>
       </div>

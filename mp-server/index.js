@@ -259,7 +259,7 @@ app.post("/api/games/:id/join", (req, res) => {
 
 const API_BASE = process.env.PEPCHESS_API_URL || "http://127.0.0.1:8001";
 
-// Create PEP match (only white)
+// Create PEP match (any player, but only once)
 app.post("/api/games/:id/pep/create", async (req, res) => {
   const id = (req.params.id || "").trim();
   const game = games.get(id);
@@ -267,8 +267,13 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
 
   const { token, stake, whiteAddress, blackAddress } = req.body || {};
   const seat = seatFromToken(game, token);
-  if (seat !== "white") {
-    return res.status(403).json({ error: "Only white can create the PEP match." });
+  if (seat === "spectator") {
+    return res.status(403).json({ error: "Only players can create the PEP match." });
+  }
+
+  // Prevent creating multiple PEP matches
+  if (game.pep.matchId) {
+    return res.status(400).json({ error: "PEP match already exists." });
   }
 
   if (!stake || !whiteAddress || !blackAddress) {
