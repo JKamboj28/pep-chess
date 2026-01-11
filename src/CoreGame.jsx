@@ -498,9 +498,9 @@ const hasAnyGameMove = isOnline
 
 const canAbortPepMatch = !!pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
-// Show both escrow addresses to both players (but not spectators)
-const showWhiteEscrow = !isOnline ? true : (seat === "white" || seat === "black");
-const showBlackEscrow = !isOnline ? true : (seat === "white" || seat === "black");
+// Each player only sees their own escrow address (not the opponent's)
+const showWhiteEscrow = !isOnline ? true : seat === "white";
+const showBlackEscrow = !isOnline ? true : seat === "black";
 
 
   const stakeNumber = parseFloat(pepStake) || 0;
@@ -1068,6 +1068,21 @@ const showBlackEscrow = !isOnline ? true : (seat === "white" || seat === "black"
     setMpPendingPromotion(null);
     setMpCheckSquare(null);
     setMpMoveRows([]);
+
+    // Clear PEP state when leaving game
+    setPepMatchId(null);
+    setPepMatchStatus("idle");
+    setPepWhiteEscrow("");
+    setPepBlackEscrow("");
+    setPepWhiteAddress("");
+    setPepBlackAddress("");
+    setPepStake("1000");
+    setPepError("");
+    setPepInfoMessage("");
+    setPepWhiteDeposit(0);
+    setPepBlackDeposit(0);
+    setPepConfirmedDeposits(0);
+    setPepResultSent(false);
 
     setMode("online");
   }
