@@ -489,10 +489,9 @@ const canCreatePepMatch =
   (!isOnline || seat === "white" || seat === "black");
 
 // Check if any actual moves have been made (not just game status)
+// For online: check ply count or moves array length (pgn can have headers before moves)
 const hasAnyGameMove = isOnline
-  ? ((mpState?.ply ?? 0) > 0 ||
-     ((mpState?.pgn?.trim?.() ?? "") !== "") ||
-     (mpState?.moves?.length ?? 0) > 0)
+  ? ((mpState?.ply ?? 0) > 0 || (mpState?.moves?.length ?? 0) > 0)
   : (moves.length > 0);
 
 const canAbortPepMatch = !!pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
