@@ -2106,7 +2106,10 @@ const copyInvite = async () => {
               <button
                 className="reset-btn"
                 onClick={() => {
+                  // Reset both local and online chess instances
                   resetBoardOnlyLocal();
+                  mpChessRef.current = new Chess();
+                  setMode("local"); // Switch to local mode so board shows local position
                   setLeftOnlineGame(false);
                   setPepStake("");
                   setMpStatusMsg("");
