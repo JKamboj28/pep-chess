@@ -2054,12 +2054,11 @@ const copyInvite = async () => {
             </a>
 
             <button
-              className="control-btn"
+              className="copy-invite-btn"
               onClick={copyInvite}
-              style={{ padding: "6px 12px", fontSize: 12 }}
               type="button"
             >
-              {inviteCopied ? "Copied" : "Copy"}
+              {inviteCopied ? "Copied!" : "Copy"}
             </button>
           </div>
         )}
@@ -2264,8 +2263,8 @@ const copyInvite = async () => {
                 </>
               ) : (
                 <>
-                  <button className="control-btn" onClick={handleDrawClickLocal} disabled={gameEnded}>
-                    Draw
+                  <button className="control-btn" onClick={handleDrawClickLocal} disabled={gameEnded || !hasStarted}>
+                    Offer Draw
                   </button>
                   <button className="control-btn control-btn-resign" onClick={handleResignClickLocal} disabled={gameEnded}>
                     {hasStarted ? "Resign" : "Abort"}
@@ -2280,7 +2279,7 @@ const copyInvite = async () => {
                     if (mpState?.drawOffer && mpState.drawOffer.by !== mpSeat) mpAcceptDraw();
                     else mpOfferDraw();
                   }}
-                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || !hasAnyGameMove}
                   title={mpState?.drawOffer ? "Accept draw" : "Offer draw"}
                 >
                   {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
