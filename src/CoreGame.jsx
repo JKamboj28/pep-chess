@@ -495,6 +495,13 @@ const hasAnyGameMove = isOnline
   ? ((mpState?.ply ?? 0) > 0 || (mpState?.moves?.length ?? 0) > 0)
   : (moves.length > 0);
 
+// Check if the CURRENT player has made any move (for Abort vs Resign button)
+// White moves on ply 1,3,5... so white has moved if ply >= 1
+// Black moves on ply 2,4,6... so black has moved if ply >= 2
+const currentPlayerHasMoved = isOnline
+  ? (mpSeat === "white" ? (mpState?.moves?.length ?? 0) >= 1 : (mpState?.moves?.length ?? 0) >= 2)
+  : (moves.length > 0);
+
 const canAbortPepMatch = !!pepMatchId && !hasAnyGameMove && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play");
 
 // Each player only sees their own escrow address (not the opponent's)
@@ -2258,13 +2265,13 @@ const copyInvite = async () => {
                 >
                   {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
                 </button>
-                {/* Show Abort before first move, Resign after */}
+                {/* Show Abort before player's first move, Resign after */}
                 <button
                   className="control-btn control-btn-resign"
-                  onClick={hasAnyGameMove ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
+                  onClick={currentPlayerHasMoved ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
                   disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
                 >
-                  {hasAnyGameMove ? "Resign" : "Abort"}
+                  {currentPlayerHasMoved ? "Resign" : "Abort"}
                 </button>
               </>
             )}
