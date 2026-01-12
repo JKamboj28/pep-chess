@@ -2098,7 +2098,7 @@ const copyInvite = async () => {
               {statusText}
             </span>
 
-            {isOnline ? (
+            {mpGameId ? (
               <button className="reset-btn" onClick={leaveOnlineGame}>
                 Leave Game
               </button>
