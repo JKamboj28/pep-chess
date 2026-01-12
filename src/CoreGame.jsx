@@ -414,7 +414,7 @@ const blackClockActive = isOnline
     pepMatchStatus === "waiting_for_deposits" ||
     pepMatchStatus === "ready_to_play";
 
-  const [pepStake, setPepStake] = useState("1000");
+  const [pepStake, setPepStake] = useState("");
   const [pepWhiteAddress, setPepWhiteAddress] = useState("");
   const [pepBlackAddress, setPepBlackAddress] = useState("");
   const [pepError, setPepError] = useState("");
@@ -2178,10 +2178,11 @@ const copyInvite = async () => {
             <h2 className="pep-title">PEP Match (optional)</h2>
             <p className="pep-subtitle">
               Both players stake the same PEP amount, and the winner automatically receives the pot from escrow.
+              Leave stake blank or 0 for a free game.
             </p>
 
             <div className="pep-field-row">
-              <label className="pep-label">Stake (PEP) - Only send PEP from a wallet you control</label>
+              <label className="pep-label">Stake (PEP) - Leave blank for free game</label>
               <input
                 className="pep-input"
                 type="number"
@@ -2193,41 +2194,46 @@ const copyInvite = async () => {
                   if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) setPepStake(value);
                 }}
                 disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
-
+                placeholder="0"
               />
             </div>
 
-            <div className="pep-field-row">
-              <label className="pep-label">White PEP payout address</label>
-              <input
-                className="pep-input"
-                type="text"
-                value={pepWhiteAddress}
-                onChange={(e) => setPepWhiteAddress(e.target.value)}
-                disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
-                placeholder={isOnline && mpSeat !== "white" ? "Only White can enter this" : ""}
-              />
-            </div>
+            {/* Only show address fields and Create button if stake > 0 */}
+            {parseFloat(pepStake) > 0 && (
+              <>
+                <div className="pep-field-row">
+                  <label className="pep-label">White PEP payout address</label>
+                  <input
+                    className="pep-input"
+                    type="text"
+                    value={pepWhiteAddress}
+                    onChange={(e) => setPepWhiteAddress(e.target.value)}
+                    disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
+                    placeholder={isOnline && mpSeat !== "white" ? "Only White can enter this" : ""}
+                  />
+                </div>
 
-            <div className="pep-field-row">
-              <label className="pep-label">Black PEP payout address</label>
-              <input
-                className="pep-input"
-                type="text"
-                value={pepBlackAddress}
-                onChange={(e) => setPepBlackAddress(e.target.value)}
-                disabled={isPepMatchLocked || (isOnline && mpSeat !== "black")}
-                placeholder={isOnline && mpSeat !== "black" ? "Only Black can enter this" : ""}
-              />
-            </div>
+                <div className="pep-field-row">
+                  <label className="pep-label">Black PEP payout address</label>
+                  <input
+                    className="pep-input"
+                    type="text"
+                    value={pepBlackAddress}
+                    onChange={(e) => setPepBlackAddress(e.target.value)}
+                    disabled={isPepMatchLocked || (isOnline && mpSeat !== "black")}
+                    placeholder={isOnline && mpSeat !== "black" ? "Only Black can enter this" : ""}
+                  />
+                </div>
 
-            <button
-              className="pep-button"
-              onClick={createPepMatch}
-              disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
-            >
-              {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
-            </button>
+                <button
+                  className="pep-button"
+                  onClick={createPepMatch}
+                  disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
+                >
+                  {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
+                </button>
+              </>
+            )}
 
             {/* <button
               className="pep-button pep-button-abort"
@@ -2243,8 +2249,11 @@ const copyInvite = async () => {
               </button>
             )}
 
-            {/* Escrow addresses (with copy buttons) */}
-            {showWhiteEscrow && (
+            {/* Escrow addresses and status - only show when stake > 0 */}
+            {parseFloat(pepStake) > 0 && (
+              <>
+                {/* Escrow addresses (with copy buttons) */}
+                {showWhiteEscrow && (
               <div className="pep-address-row">
                 <div className="pep-status-label">White escrow</div>
                 <div className="pep-escrow-address-row">
@@ -2361,6 +2370,8 @@ const copyInvite = async () => {
 
             {pepInfoMessage && <div className="pep-info">{shortMessage(pepInfoMessage)}</div>}
             {pepError && <div className="pep-error">{shortMessage(pepError, "PEP match error.")}</div>}
+              </>
+            )}
 
           </div>
         </div>

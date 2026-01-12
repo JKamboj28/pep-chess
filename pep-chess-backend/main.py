@@ -18,9 +18,9 @@ app.add_middleware(
 
 
 class CreateMatchRequest(BaseModel):
-    stake: float
-    white_address: str
-    black_address: str
+    stake: float = 0.0
+    white_address: str = ""
+    black_address: str = ""
 
 
 class ReportResultRequest(BaseModel):
@@ -34,22 +34,28 @@ matches: dict[str, dict] = {}
 
 @app.post("/api/matches")
 def create_match(req: CreateMatchRequest):
-    if req.stake <= 0:
-        raise HTTPException(400, "Stake must be positive.")
-    if not req.white_address or not req.black_address:
-        raise HTTPException(400, "Both payout addresses are required.")
+    if req.stake < 0:
+        raise HTTPException(400, "Stake cannot be negative.")
+    # For free games (stake = 0), addresses are optional
+    if req.stake > 0 and (not req.white_address or not req.black_address):
+        raise HTTPException(400, "Both payout addresses are required for paid games.")
 
     match_id = str(uuid.uuid4())
 
-    # One escrow address per player
-    try:
-        white_escrow = pep_rpc("getnewaddress", ["pepchess_white"])
-        black_escrow = pep_rpc("getnewaddress", ["pepchess_black"])
-    except Exception as exc:
-        raise HTTPException(
-            500,
-            f"PEP RPC error while creating escrow addresses: {exc}",
-        )
+    # For free games (stake = 0), skip escrow creation
+    if req.stake > 0:
+        try:
+            white_escrow = pep_rpc("getnewaddress", ["pepchess_white"])
+            black_escrow = pep_rpc("getnewaddress", ["pepchess_black"])
+        except Exception as exc:
+            raise HTTPException(
+                500,
+                f"PEP RPC error while creating escrow addresses: {exc}",
+            )
+    else:
+        # Free game - no escrow needed
+        white_escrow = ""
+        black_escrow = ""
 
     matches[match_id] = {
         "id": match_id,
@@ -60,20 +66,20 @@ def create_match(req: CreateMatchRequest):
         "black_escrow": black_escrow,
         "white_deposit": 0.0,
         "black_deposit": 0.0,
-        "status": "waiting_for_deposits",
+        "status": "ready_to_play" if req.stake == 0 else "waiting_for_deposits",
         "result": None,
         "tx_ids": [],
         # cumulative amount of "extra above stake" already refunded
         "white_extra_amount": 0.0,
         "black_extra_amount": 0.0,
-        "confirmed_deposits": 0,
+        "confirmed_deposits": 2 if req.stake == 0 else 0,
     }
 
 
     return {
         "matchId": match_id,
         "stake": float(req.stake),
-        "status": "waiting_for_deposits",
+        "status": "ready_to_play" if req.stake == 0 else "waiting_for_deposits",
         "whiteEscrow": white_escrow,
         "blackEscrow": black_escrow,
         "whiteDeposit": 0.0,
@@ -93,9 +99,10 @@ def get_match(match_id: str):
     if not m:
         raise HTTPException(404, "Match not found.")
 
-    if m["status"] in ("waiting_for_deposits", "ready_to_play"):
+    stake = float(m["stake"])
+    # Skip deposit checking for free games (stake = 0)
+    if stake > 0 and m["status"] in ("waiting_for_deposits", "ready_to_play"):
         try:
-            stake = float(m["stake"])
             white_dep_total = float(
                 pep_rpc("getreceivedbyaddress", [m["white_escrow"], 1])
             )
@@ -197,39 +204,43 @@ def abort_match(match_id: str):
         raise HTTPException(400, "Match already settled or aborted.")
 
     stake = float(m["stake"])
-
-    try:
-        white_dep_total = float(
-            pep_rpc("getreceivedbyaddress", [m["white_escrow"], 1])
-        )
-        black_dep_total = float(
-            pep_rpc("getreceivedbyaddress", [m["black_escrow"], 1])
-        )
-    except Exception as exc:
-        raise HTTPException(
-            500, f"PEP RPC error while checking deposits: {exc}"
-        )
-
-    white_to_refund = min(white_dep_total, stake)
-    black_to_refund = min(black_dep_total, stake)
-
-    if white_to_refund <= 0 and black_to_refund <= 0:
-        raise HTTPException(400, "No deposits to refund.")
-
     tx_ids: list[str] = []
-    try:
-        if white_to_refund > 0:
-            tx_ids.append(
-                pep_rpc("sendtoaddress", [m["white_address"], white_to_refund])
+    white_dep_total = 0.0
+    black_dep_total = 0.0
+
+    # For free games (stake = 0), just mark as aborted without RPC calls
+    if stake > 0:
+        try:
+            white_dep_total = float(
+                pep_rpc("getreceivedbyaddress", [m["white_escrow"], 1])
             )
-        if black_to_refund > 0:
-            tx_ids.append(
-                pep_rpc("sendtoaddress", [m["black_address"], black_to_refund])
+            black_dep_total = float(
+                pep_rpc("getreceivedbyaddress", [m["black_escrow"], 1])
             )
-    except Exception as exc:
-        raise HTTPException(
-            500, f"PEP RPC error while refunding: {exc}"
-        )
+        except Exception as exc:
+            raise HTTPException(
+                500, f"PEP RPC error while checking deposits: {exc}"
+            )
+
+        white_to_refund = min(white_dep_total, stake)
+        black_to_refund = min(black_dep_total, stake)
+
+        if white_to_refund <= 0 and black_to_refund <= 0:
+            raise HTTPException(400, "No deposits to refund.")
+
+        try:
+            if white_to_refund > 0:
+                tx_ids.append(
+                    pep_rpc("sendtoaddress", [m["white_address"], white_to_refund])
+                )
+            if black_to_refund > 0:
+                tx_ids.append(
+                    pep_rpc("sendtoaddress", [m["black_address"], black_to_refund])
+                )
+        except Exception as exc:
+            raise HTTPException(
+                500, f"PEP RPC error while refunding: {exc}"
+            )
 
     m["status"] = "aborted"
     m["result"] = "aborted"
@@ -272,59 +283,63 @@ def report_result(match_id: str, req: ReportResultRequest):
             400, "Invalid result; must be 'white', 'black' or 'draw'."
         )
 
-    # Refresh deposits one last time
-    try:
-        white_dep_total = float(
-            pep_rpc("getreceivedbyaddress", [m["white_escrow"], 1])
-        )
-        black_dep_total = float(
-            pep_rpc("getreceivedbyaddress", [m["black_escrow"], 1])
-        )
-    except Exception as exc:
-        raise HTTPException(
-            500, f"PEP RPC error while checking deposits: {exc}"
-        )
-
-    m["white_deposit"] = white_dep_total
-    m["black_deposit"] = black_dep_total
-
     stake = float(m["stake"])
     tx_ids: list[str] = []
+    white_dep_total = 0.0
+    black_dep_total = 0.0
 
-    # effective stake contribution from each side (cap at stake)
-    used_from_white = min(white_dep_total, stake)
-    used_from_black = min(black_dep_total, stake)
-    pot = used_from_white + used_from_black  # normally 2 * stake
-
-    try:
-        if result == "draw":
-            # Draw: each side gets back up to stake they put in.
-            if used_from_white > 0:
-                tx_ids.append(
-                    pep_rpc(
-                        "sendtoaddress", [m["white_address"], used_from_white]
-                    )
-                )
-            if used_from_black > 0:
-                tx_ids.append(
-                    pep_rpc(
-                        "sendtoaddress", [m["black_address"], used_from_black]
-                    )
-                )
-        else:
-            # Winner case
-            winner_addr = (
-                m["white_address"] if result == "white" else m["black_address"]
+    # For free games (stake = 0), skip all RPC calls
+    if stake > 0:
+        # Refresh deposits one last time
+        try:
+            white_dep_total = float(
+                pep_rpc("getreceivedbyaddress", [m["white_escrow"], 1])
             )
-            if pot > 0:
-                tx_ids.append(
-                    pep_rpc("sendtoaddress", [winner_addr, pot])
-                )
+            black_dep_total = float(
+                pep_rpc("getreceivedbyaddress", [m["black_escrow"], 1])
+            )
+        except Exception as exc:
+            raise HTTPException(
+                500, f"PEP RPC error while checking deposits: {exc}"
+            )
 
-    except Exception as exc:
-        raise HTTPException(
-            500, f"PEP RPC error while sending payout/refunds: {exc}"
-        )
+        m["white_deposit"] = white_dep_total
+        m["black_deposit"] = black_dep_total
+
+        # effective stake contribution from each side (cap at stake)
+        used_from_white = min(white_dep_total, stake)
+        used_from_black = min(black_dep_total, stake)
+        pot = used_from_white + used_from_black  # normally 2 * stake
+
+        try:
+            if result == "draw":
+                # Draw: each side gets back up to stake they put in.
+                if used_from_white > 0:
+                    tx_ids.append(
+                        pep_rpc(
+                            "sendtoaddress", [m["white_address"], used_from_white]
+                        )
+                    )
+                if used_from_black > 0:
+                    tx_ids.append(
+                        pep_rpc(
+                            "sendtoaddress", [m["black_address"], used_from_black]
+                        )
+                    )
+            else:
+                # Winner case
+                winner_addr = (
+                    m["white_address"] if result == "white" else m["black_address"]
+                )
+                if pot > 0:
+                    tx_ids.append(
+                        pep_rpc("sendtoaddress", [winner_addr, pot])
+                    )
+
+        except Exception as exc:
+            raise HTTPException(
+                500, f"PEP RPC error while sending payout/refunds: {exc}"
+            )
 
     m["status"] = "settled"
     m["result"] = result
