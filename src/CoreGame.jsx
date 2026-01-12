@@ -2290,13 +2290,13 @@ const copyInvite = async () => {
                   const value = e.target.value;
                   if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) setPepStake(value);
                 }}
-                disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
+                disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && mpSeat !== "white")}
                 placeholder="0"
               />
             </div>
 
-            {/* Only show address fields and Create button if stake > 0 */}
-            {parseFloat(pepStake) > 0 && (
+            {/* Only show address fields and Create button if stake > 0 and game hasn't started */}
+            {parseFloat(pepStake) > 0 && !hasAnyGameMove && (
               <>
                 <div className="pep-field-row">
                   <label className="pep-label">White PEP payout address</label>
