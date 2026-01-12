@@ -378,6 +378,7 @@ function App() {
   const [mpPendingPromotion, setMpPendingPromotion] = useState(null); // { from,to,color }
   const [mpCheckSquare, setMpCheckSquare] = useState(null);
   const [mpMoveRows, setMpMoveRows] = useState([]);
+  const [leftOnlineGame, setLeftOnlineGame] = useState(false); // Track if we just left an online game
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -1090,6 +1091,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setPepConfirmedDeposits(0);
     setPepResultSent(false);
 
+    setLeftOnlineGame(true); // Show Reset Game button
     setMode("online");
   }
 
@@ -2096,7 +2098,23 @@ const copyInvite = async () => {
               {statusText}
             </span>
 
-            {!isOnline ? (
+            {isOnline ? (
+              <button className="reset-btn" onClick={leaveOnlineGame}>
+                Leave Game
+              </button>
+            ) : leftOnlineGame ? (
+              <button
+                className="reset-btn"
+                onClick={() => {
+                  resetBoardOnlyLocal();
+                  setLeftOnlineGame(false);
+                  setPepStake("");
+                  setMpStatusMsg("");
+                }}
+              >
+                Reset Game
+              </button>
+            ) : (
               <button
                 className="reset-btn"
                 onClick={resetGameLocal}
@@ -2104,10 +2122,6 @@ const copyInvite = async () => {
                 title={canResetLocal ? "" : "Reset is disabled while a game is in progress"}
               >
                 Reset Game
-              </button>
-            ) : (
-              <button className="reset-btn" onClick={leaveOnlineGame}>
-                Leave Game
               </button>
             )}
           </div>
