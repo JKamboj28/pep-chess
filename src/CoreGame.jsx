@@ -2284,13 +2284,13 @@ const copyInvite = async () => {
                 >
                   {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
                 </button>
-                {/* Show Abort before player's first move, Resign after */}
+                {/* Show Abort/Abort & Refund before player's first move, Resign after */}
                 <button
                   className="control-btn control-btn-resign"
                   onClick={currentPlayerHasMoved ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
                   disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
                 >
-                  {currentPlayerHasMoved ? "Resign" : "Abort"}
+                  {currentPlayerHasMoved ? "Resign" : (pepMatchId ? "Abort & Refund" : "Abort")}
                 </button>
               </>
             )}
@@ -2356,12 +2356,6 @@ const copyInvite = async () => {
                   {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
                 </button>
               </>
-            )}
-
-            {canAbortPepMatch && (
-              <button className="btn abort-btn" onClick={abortPepMatch}>
-                Abort & Refund PEP
-              </button>
             )}
 
             {/* Escrow addresses and status - only show when stake > 0 and PEP match exists */}
