@@ -305,6 +305,7 @@ function App() {
   const [lastMove, setLastMove] = useState(null); // [from, to]
   const [status, setStatus] = useState("White to move.");
   const [moves, setMoves] = useState([]); // [{ no, white, black }]
+  const [viewPly, setViewPly] = useState(null); // null = current position, number = viewing history
   const [checkSquare, setCheckSquare] = useState(null);
   const [pendingPromotion, setPendingPromotion] = useState(null); // { from, to, color }
   const hasStarted = moves.length > 0;
@@ -1785,12 +1786,61 @@ function renderCapturedRow(sideColor) {
   // ---------------------------
   // Derived UI model for board/moves/status
   // ---------------------------
-  const boardPosition = isOnline ? (mpState?.fen || mpChessRef.current.fen()) : position;
+
+  // Calculate total ply count from moves
+  const totalPly = useMemo(() => {
+    if (isOnline) {
+      return mpState?.moves?.length ?? 0;
+    } else {
+      // Local game: count from moves array (each row has up to 2 moves)
+      return gameRef.current.history().length;
+    }
+  }, [isOnline, mpState?.moves?.length, position]);
+
+  // Compute position at a specific ply for history navigation
+  const getPositionAtPly = useMemo(() => {
+    return (ply) => {
+      if (ply === null || ply === totalPly) {
+        // Current position
+        return isOnline ? (mpState?.fen || mpChessRef.current.fen()) : position;
+      }
+      // Replay moves to get position at ply
+      const tempChess = new Chess();
+      const history = isOnline
+        ? (mpState?.moves || []).map(m => m.san)
+        : gameRef.current.history();
+
+      for (let i = 0; i < ply && i < history.length; i++) {
+        tempChess.move(history[i]);
+      }
+      return tempChess.fen();
+    };
+  }, [isOnline, mpState?.fen, mpState?.moves, position, totalPly]);
+
+  // Navigation functions
+  const navFirst = () => setViewPly(0);
+  const navPrev = () => setViewPly(p => Math.max(0, (p ?? totalPly) - 1));
+  const navNext = () => setViewPly(p => {
+    const next = (p ?? totalPly) + 1;
+    return next >= totalPly ? null : next;
+  });
+  const navLast = () => setViewPly(null);
+
+  // Reset viewPly when new moves are made
+  useEffect(() => {
+    setViewPly(null);
+  }, [totalPly]);
+
+  const currentBoardPosition = isOnline ? (mpState?.fen || mpChessRef.current.fen()) : position;
+  const boardPosition = viewPly === null ? currentBoardPosition : getPositionAtPly(viewPly);
+  const isViewingHistory = viewPly !== null && viewPly < totalPly;
+
   const gameEnded = isOnline ? (mpState?.status === "ended") : isGameStoppedLocal;
 
   const areDraggable =
     !pepBoardLocked &&
     !gameEnded &&
+    !isViewingHistory &&
     !(isOnline ? mpPendingPromotion : pendingPromotion) &&
     (isOnline ? (mpIsPlayer && mpMyTurn && mpState?.status === "playing") : true);
 
@@ -2066,6 +2116,21 @@ const copyInvite = async () => {
 
           {/* Moves table */}
           <div className="moves-panel">
+            {/* Move navigation buttons */}
+            <div className="move-nav-buttons">
+              <button className="move-nav-btn" onClick={navFirst} disabled={totalPly === 0 || viewPly === 0} title="First move">
+                &#x23EE;
+              </button>
+              <button className="move-nav-btn" onClick={navPrev} disabled={totalPly === 0 || viewPly === 0} title="Previous move">
+                &#x23F4;
+              </button>
+              <button className="move-nav-btn" onClick={navNext} disabled={totalPly === 0 || viewPly === null} title="Next move">
+                &#x23F5;
+              </button>
+              <button className="move-nav-btn" onClick={navLast} disabled={totalPly === 0 || viewPly === null} title="Last move">
+                &#x23ED;
+              </button>
+            </div>
             <div className="moves-header">
               <span>#</span>
               <span>White</span>
