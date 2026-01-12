@@ -2151,24 +2151,14 @@ const copyInvite = async () => {
                 >
                   {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
                 </button>
-                {/* Show Abort & refund before first move if PEP match active, otherwise Resign */}
-                {!hasAnyGameMove && pepMatchId && (pepMatchStatus === "waiting_for_deposits" || pepMatchStatus === "ready_to_play") ? (
-                  <button
-                    className="control-btn control-btn-resign"
-                    onClick={abortPepMatch}
-                    disabled={!mpIsPlayer}
-                  >
-                    Abort & refund
-                  </button>
-                ) : (
-                  <button
-                    className="control-btn control-btn-resign"
-                    onClick={mpResign}
-                    disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
-                  >
-                    Resign
-                  </button>
-                )}
+                {/* Show Abort before first move, Resign after */}
+                <button
+                  className="control-btn control-btn-resign"
+                  onClick={hasAnyGameMove ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
+                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                >
+                  {hasAnyGameMove ? "Resign" : "Abort"}
+                </button>
               </>
             )}
           </div>
