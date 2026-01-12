@@ -276,7 +276,10 @@ function seatToColor(seat) {
 function mpStatusText(mpState) {
   if (!mpState) return "Not connected.";
   if (mpState.status === "waiting") return "Waiting for opponent…";
-  if (mpState.status === "playing") return "Playing.";
+  if (mpState.status === "playing") {
+    const turn = mpState.turn === "w" ? "White" : "Black";
+    return `${turn} to move`;
+  }
   if (mpState.status === "ended") {
     const r = mpState.result || "";
     const reason = mpState.reason ? ` (${mpState.reason})` : "";
@@ -1083,7 +1086,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setPepBlackEscrow("");
     setPepWhiteAddress("");
     setPepBlackAddress("");
-    setPepStake("1000");
+    setPepStake("");
     setPepError("");
     setPepInfoMessage("");
     setPepWhiteDeposit(0);
@@ -2296,14 +2299,14 @@ const copyInvite = async () => {
 
           {/* PEP match controls */}
           <div className="pep-panel">
-            <h2 className="pep-title">PEP Match (optional)</h2>
+            <h2 className="pep-title">PEP Stake (optional)</h2>
             <p className="pep-subtitle">
-              Both players stake the same PEP amount, and the winner automatically receives the pot from escrow.
-              Leave stake blank or 0 for a free game.
+              Stake PEP to play for real money. Winner takes the pot from escrow.
+              Leave blank for a free game.
             </p>
 
             <div className="pep-field-row">
-              <label className="pep-label">Stake (PEP) - Leave blank for free game</label>
+              <label className="pep-label">Stake amount (PEP)</label>
               <input
                 className="pep-input"
                 type="number"
@@ -2356,143 +2359,101 @@ const copyInvite = async () => {
               </>
             )}
 
-            {/* <button
-              className="pep-button pep-button-abort"
-              onClick={abortPepMatch}
-              disabled={!canAbortPepMatch}
-            >
-              Abort match & refund
-            </button> */}
-
             {canAbortPepMatch && (
               <button className="btn abort-btn" onClick={abortPepMatch}>
-                Abort match & refund
+                Abort & Refund PEP
               </button>
             )}
 
-            {/* Escrow addresses and status - only show when stake > 0 */}
-            {parseFloat(pepStake) > 0 && (
+            {/* Escrow addresses and status - only show when stake > 0 and PEP match exists */}
+            {parseFloat(pepStake) > 0 && pepMatchId && (
               <>
                 {/* Escrow addresses (with copy buttons) */}
-                {showWhiteEscrow && (
-              <div className="pep-address-row">
-                <div className="pep-status-label">White escrow</div>
-                <div className="pep-escrow-address-row">
-                  <div className="pep-escrow-address">{pepWhiteEscrow || "—"}</div>
-                  <button
-                    type="button"
-                    className="pep-copy-btn"
-                    // onClick={() => {
-                    //   if (!pepWhiteEscrow) return;
-                    //   navigator.clipboard.writeText(pepWhiteEscrow);
-                    //   setCopiedWhiteEscrow(true);
-                    //   setTimeout(() => setCopiedWhiteEscrow(false), 1500);
-                    // }}
-                    onClick={async () => {
-                      const ok = await copyText(pepWhiteEscrow);
-                      if (!ok) return;
-                      setCopiedWhiteEscrow(true);
-                      setTimeout(() => setCopiedWhiteEscrow(false), 1500);
-                    }}
-                    disabled={!pepWhiteEscrow}
-                  >
-                    Copy
-                  </button>
-                  {copiedWhiteEscrow && <span className="pep-copy-msg">Copied!</span>}
-                </div>
-              </div>
-            )}
-
-            {showBlackEscrow && (
-              <div className="pep-address-row">
-                <div className="pep-status-label">Black escrow</div>
-                <div className="pep-escrow-address-row">
-                  <div className="pep-escrow-address">{pepBlackEscrow || "—"}</div>
-                  <button
-                    type="button"
-                    className="pep-copy-btn"
-                    // onClick={() => {
-                    //   if (!pepBlackEscrow) return;
-                    //   navigator.clipboard.writeText(pepBlackEscrow);
-                    //   setCopiedBlackEscrow(true);
-                    //   setTimeout(() => setCopiedBlackEscrow(false), 1500);
-                    // }}
-                    onClick={async () => {
-                      const ok = await copyText(pepBlackEscrow);
-                      if (!ok) return;
-                      setCopiedBlackEscrow(true);
-                      setTimeout(() => setCopiedBlackEscrow(false), 1500);
-                    }}
-                    disabled={!pepBlackEscrow}
-                  >
-                    Copy
-                  </button>
-                  {copiedBlackEscrow && <span className="pep-copy-msg">Copied!</span>}
-                </div>
-              </div>
-            )}
-
-
-            {pepEscrowAddress && (
-              <div className="pep-escrow">
-                <div className="pep-escrow-label">Escrow address</div>
-                <code className="pep-escrow-value">{pepEscrowAddress}</code>
-              </div>
-            )}
-
-            <div className="pep-status-row">
-              <span className="pep-status-label">Status:</span>
-              <span className="pep-status-value">
-                {pepMatchStatus === "idle" && "No match"}
-                {pepMatchStatus === "creating" && "Creating match…"}
-                {pepMatchStatus === "waiting_for_deposits" && "Waiting for both deposits…"}
-                {pepMatchStatus === "ready_to_play" && "Ready to play"}
-                {pepMatchStatus === "settled" && "Settled on-chain"}
-                {pepMatchStatus === "error" && "Error – check message below"}
-                {pepMatchStatus === "aborted" && "Aborted"}
-              </span>
-            </div>
-
-            <div className="pep-status-line">Deposits: {confirmedDeposits} / 2 confirmed</div>
-
-            <div className="pep-deposit-status">
-              <span className={"pep-deposit-inline" + (whiteDepositOk ? " pep-deposit-ok" : "")}>
-                <span className="pep-dot" />
-                White {pepWhiteDeposit.toFixed(4)} PEP
-              </span>
-
-              <span className={"pep-deposit-inline" + (blackDepositOk ? " pep-deposit-ok" : "")}>
-                <span className="pep-dot" />
-                Black {pepBlackDeposit.toFixed(4)} PEP
-              </span>
-            </div>
-
-            {pepMatchStatus !== "settled" && pepMatchStatus !== "aborted" && (
-              <>
-                {pepWhiteDeposit > stakeNumber && !pepWhiteExtraRefunded && (
-                  <div className="pep-warning-line">
-                    White overpaid (stake {stakeNumber.toFixed(4)} PEP); extra will be refunded.
+                {showWhiteEscrow && pepWhiteEscrow && (
+                  <div className="pep-address-row">
+                    <div className="pep-status-label">Your escrow address</div>
+                    <div className="pep-escrow-address-row">
+                      <div className="pep-escrow-address">{pepWhiteEscrow}</div>
+                      <button
+                        type="button"
+                        className="pep-copy-btn"
+                        onClick={async () => {
+                          const ok = await copyText(pepWhiteEscrow);
+                          if (!ok) return;
+                          setCopiedWhiteEscrow(true);
+                          setTimeout(() => setCopiedWhiteEscrow(false), 1500);
+                        }}
+                      >
+                        {copiedWhiteEscrow ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
                   </div>
                 )}
-                {pepBlackDeposit > stakeNumber && !pepBlackExtraRefunded && (
-                  <div className="pep-warning-line">
-                    Black overpaid (stake {stakeNumber.toFixed(4)} PEP); extra will be refunded.
+
+                {showBlackEscrow && pepBlackEscrow && (
+                  <div className="pep-address-row">
+                    <div className="pep-status-label">Your escrow address</div>
+                    <div className="pep-escrow-address-row">
+                      <div className="pep-escrow-address">{pepBlackEscrow}</div>
+                      <button
+                        type="button"
+                        className="pep-copy-btn"
+                        onClick={async () => {
+                          const ok = await copyText(pepBlackEscrow);
+                          if (!ok) return;
+                          setCopiedBlackEscrow(true);
+                          setTimeout(() => setCopiedBlackEscrow(false), 1500);
+                        }}
+                      >
+                        {copiedBlackEscrow ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
                   </div>
+                )}
+
+                <div className="pep-status-row">
+                  <span className="pep-status-label">Status:</span>
+                  <span className="pep-status-value">
+                    {pepMatchStatus === "creating" && "Creating match…"}
+                    {pepMatchStatus === "waiting_for_deposits" && "Waiting for deposits…"}
+                    {pepMatchStatus === "ready_to_play" && "Ready to play!"}
+                    {pepMatchStatus === "settled" && "Settled on-chain"}
+                    {pepMatchStatus === "error" && "Error"}
+                    {pepMatchStatus === "aborted" && "Aborted"}
+                  </span>
+                </div>
+
+                <div className="pep-deposit-status">
+                  <span className={"pep-deposit-inline" + (whiteDepositOk ? " pep-deposit-ok" : "")}>
+                    <span className="pep-dot" />
+                    White: {pepWhiteDeposit.toFixed(2)} / {stakeNumber.toFixed(2)} PEP
+                  </span>
+                  <span className={"pep-deposit-inline" + (blackDepositOk ? " pep-deposit-ok" : "")}>
+                    <span className="pep-dot" />
+                    Black: {pepBlackDeposit.toFixed(2)} / {stakeNumber.toFixed(2)} PEP
+                  </span>
+                </div>
+
+                {pepMatchStatus !== "settled" && pepMatchStatus !== "aborted" && (
+                  <>
+                    {pepWhiteDeposit > stakeNumber && !pepWhiteExtraRefunded && (
+                      <div className="pep-warning-line">
+                        White overpaid; extra will be refunded.
+                      </div>
+                    )}
+                    {pepBlackDeposit > stakeNumber && !pepBlackExtraRefunded && (
+                      <div className="pep-warning-line">
+                        Black overpaid; extra will be refunded.
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}
 
-            {pepWhiteExtraRefunded && pepWhiteExtraAmount > 0 && (
-              <div className="pep-info">Extra {pepWhiteExtraAmount.toFixed(4)} PEP refunded to White.</div>
-            )}
-            {pepBlackExtraRefunded && pepBlackExtraAmount > 0 && (
-              <div className="pep-info">Extra {pepBlackExtraAmount.toFixed(4)} PEP refunded to Black.</div>
-            )}
-
-            {pepInfoMessage && <div className="pep-info">{shortMessage(pepInfoMessage)}</div>}
-            {pepError && <div className="pep-error">{shortMessage(pepError, "PEP match error.")}</div>}
-              </>
-            )}
+            {/* Always show PEP messages if they exist */}
+            {pepInfoMessage && <div className="pep-info">{pepInfoMessage}</div>}
+            {pepError && <div className="pep-error">{pepError}</div>}
 
           </div>
         </div>

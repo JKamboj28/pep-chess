@@ -688,9 +688,22 @@ body {
     Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
-.pep-button-abort {
-  margin-top: 6px;
+.pep-button-abort,
+.abort-btn {
+  margin-top: 8px;
+  padding: 10px 16px;
   background: linear-gradient(135deg, #f97373, #ef4444);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.abort-btn:hover {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  transform: translateY(-1px);
 }
 
 .pep-button-abort:disabled {
