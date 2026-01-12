@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { Chessboard } from "react-chessboard";
 import { io } from "socket.io-client";
@@ -1817,19 +1817,44 @@ function renderCapturedRow(sideColor) {
     };
   }, [isOnline, mpState?.fen, mpState?.moves, position, totalPly]);
 
-  // Navigation functions
-  const navFirst = () => setViewPly(0);
-  const navPrev = () => setViewPly(p => Math.max(0, (p ?? totalPly) - 1));
-  const navNext = () => setViewPly(p => {
+  // Navigation functions (wrapped in useCallback for keyboard handler)
+  const navFirst = useCallback(() => setViewPly(0), []);
+  const navPrev = useCallback(() => setViewPly(p => Math.max(0, (p ?? totalPly) - 1)), [totalPly]);
+  const navNext = useCallback(() => setViewPly(p => {
     const next = (p ?? totalPly) + 1;
     return next >= totalPly ? null : next;
-  });
-  const navLast = () => setViewPly(null);
+  }), [totalPly]);
+  const navLast = useCallback(() => setViewPly(null), []);
 
   // Reset viewPly when new moves are made
   useEffect(() => {
     setViewPly(null);
   }, [totalPly]);
+
+  // Keyboard navigation for move history (arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (totalPly === 0) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navPrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        navNext();
+      } else if (e.key === 'ArrowUp' || e.key === 'Home') {
+        e.preventDefault();
+        navFirst();
+      } else if (e.key === 'ArrowDown' || e.key === 'End') {
+        e.preventDefault();
+        navLast();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [totalPly, navPrev, navNext, navFirst, navLast]);
 
   const currentBoardPosition = isOnline ? (mpState?.fen || mpChessRef.current.fen()) : position;
   const boardPosition = viewPly === null ? currentBoardPosition : getPositionAtPly(viewPly);
@@ -2059,7 +2084,10 @@ const copyInvite = async () => {
           </div>
 
           <div ref={bottomBarRef} className="bottom-bar">
-            <span className="status-text">{statusText}</span>
+            <span className="status-text">
+              {isViewingHistory && <span className="history-badge">Move {viewPly}/{totalPly}</span>}
+              {statusText}
+            </span>
 
             {!isOnline ? (
               <button
@@ -2138,13 +2166,28 @@ const copyInvite = async () => {
             </div>
             <div className="moves-body">
               {movesRowsToRender.length === 0 && <div className="moves-empty">No moves yet.</div>}
-              {movesRowsToRender.map((row) => (
-                <div key={row.no} className="moves-row">
-                  <span>{row.no}.</span>
-                  <span>{row.white}</span>
-                  <span>{row.black}</span>
-                </div>
-              ))}
+              {movesRowsToRender.map((row) => {
+                const whitePly = row.no * 2 - 1;
+                const blackPly = row.no * 2;
+                const currentPly = viewPly ?? totalPly;
+                return (
+                  <div key={row.no} className="moves-row">
+                    <span>{row.no}.</span>
+                    <span
+                      className={`move-cell ${row.white ? 'move-clickable' : ''} ${currentPly === whitePly ? 'move-active' : ''}`}
+                      onClick={() => row.white && setViewPly(whitePly === totalPly ? null : whitePly)}
+                    >
+                      {row.white}
+                    </span>
+                    <span
+                      className={`move-cell ${row.black ? 'move-clickable' : ''} ${currentPly === blackPly ? 'move-active' : ''}`}
+                      onClick={() => row.black && setViewPly(blackPly === totalPly ? null : blackPly)}
+                    >
+                      {row.black}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

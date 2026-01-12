@@ -244,17 +244,17 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 2px; /* tighter spacing */
+  gap: 1px;
   margin-top: 2px;
-  height: 20px;              /* reserve vertical space */
+  min-height: 28px;
 }
 
 .captured-row-b {
-  margin-top: 4px;              /* under black clock */
+  margin-top: 4px;
 }
 
 .captured-row-w {
-  margin-top: 4px;              /* under white clock */
+  margin-top: 4px;
 }
 
 /* empty placeholder row: keeps height, hides content */
@@ -265,7 +265,7 @@ body {
 
 .captured-glyph {
   line-height: 1;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.85); /* glow like lichess */
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.85);
 }
 
 /* "+3" style score, like lichess */
@@ -276,19 +276,27 @@ body {
 }
 
 .captured-piece {
-  width: 16px;
-  height: 16px;
-  margin: 0;
+  width: 24px;
+  height: 24px;
+  margin: 0 -2px; /* slight overlap for compact look */
   vertical-align: middle;
-  /* Add glow/shadow to make dark pieces visible on dark background */
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.8));
+  /* Strong glow to make dark pieces visible on dark background */
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
+}
+
+/* Black pieces need extra contrast */
+.captured-piece[src*="/bP."], .captured-piece[src*="/bN."],
+.captured-piece[src*="/bB."], .captured-piece[src*="/bR."],
+.captured-piece[src*="/bQ."], .captured-piece[src*="/bK."] {
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 3px #fff) drop-shadow(0 0 4px rgba(255, 255, 255, 0.7));
 }
 
 .material-score {
-  margin-left: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  opacity: 0.9;
+  margin-left: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  opacity: 1;
+  color: #fbbf24;
 }
 
 .clock-active {
@@ -337,7 +345,7 @@ body {
 
   display: flex;
   flex-direction: column;
-  height: 200px;        /* fixed card height (~10 moves window) */
+  height: 260px;        /* taller to show ~5 moves */
 }
 
 .moves-body {
@@ -398,6 +406,39 @@ body {
 .move-nav-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Clickable moves */
+.move-cell {
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.move-clickable {
+  cursor: pointer;
+}
+
+.move-clickable:hover {
+  background: rgba(148, 163, 184, 0.25);
+}
+
+.move-active {
+  background: rgba(250, 204, 21, 0.3);
+  font-weight: 600;
+}
+
+/* History viewing badge */
+.history-badge {
+  display: inline-block;
+  background: rgba(250, 204, 21, 0.2);
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  color: #fbbf24;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  margin-right: 10px;
+  font-weight: 600;
 }
 
 .moves-row:nth-child(odd) {
