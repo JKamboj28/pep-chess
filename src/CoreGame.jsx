@@ -1511,9 +1511,20 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setPepInfoMessage("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/matches/${pepMatchId}/abort`, {
-        method: "POST",
-      });
+      let res;
+      if (isOnline && mpGameId && mpToken) {
+        // ONLINE: Use mp-server endpoint so both players get the status update
+        res = await fetch(`${MP_URL}/api/games/${mpGameId}/pep/abort`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: mpToken }),
+        });
+      } else {
+        // LOCAL: Use Python API directly
+        res = await fetch(`${API_BASE_URL}/api/matches/${pepMatchId}/abort`, {
+          method: "POST",
+        });
+      }
 
       if (!res.ok) {
         const text = await res.text();
@@ -1981,8 +1992,8 @@ const copyInvite = async () => {
           Online
         </button>
 
-        {/* Show Create Game when not in a game, Leave when in a game */}
-        {!mpGameId ? (
+        {/* Only show Create Game when not in a game (Leave button is below the board) */}
+        {!mpGameId && (
           <button
             className="control-btn"
             onClick={createMpGame}
@@ -1990,15 +2001,6 @@ const copyInvite = async () => {
             title="Create a new online game"
           >
             Create Game
-          </button>
-        ) : (
-          <button
-            className="control-btn control-btn-resign"
-            onClick={leaveOnlineGame}
-            disabled={!isOnline}
-            title="Leave online game"
-          >
-            Leave Game
           </button>
         )}
 
@@ -2203,13 +2205,6 @@ const copyInvite = async () => {
             {renderCapturedRow((isOnline && seat === "black") ? "b" : "w")}
           </div>
 
-          {/* Show aborted message if PEP match was aborted */}
-          {pepMatchStatus === "aborted" && (
-            <div className="game-aborted-banner">
-              Match Aborted - All deposits have been refunded
-            </div>
-          )}
-
           {/* Draw / resign controls */}
           <div className="controls-row">
             {!isOnline ? (
@@ -2232,6 +2227,21 @@ const copyInvite = async () => {
                   </button>
                 </>
               )
+            ) : mpState?.status === "ended" || pepMatchStatus === "aborted" ? (
+              // Game ended - show appropriate message
+              <div className="game-ended-message">
+                {pepMatchStatus === "aborted"
+                  ? "Match aborted - deposits refunded"
+                  : mpState?.reason === "resignation"
+                    ? `Game ended: ${mpState?.result === "1-0" ? "White" : "Black"} wins by resignation`
+                    : mpState?.reason === "checkmate"
+                      ? `Checkmate! ${mpState?.result === "1-0" ? "White" : "Black"} wins`
+                      : mpState?.reason === "timeout"
+                        ? `Time out! ${mpState?.result === "1-0" ? "White" : mpState?.result === "0-1" ? "Black" : "Draw"}`
+                        : mpState?.reason
+                          ? `Game ended: ${mpState.reason}`
+                          : "Game ended"}
+              </div>
             ) : (
               <>
 {/* Draw controls - show Accept/Decline when opponent offers, otherwise show Offer button */}

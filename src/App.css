@@ -948,17 +948,16 @@ body {
   color: #4ade80; /* green success */
 }
 
-/* Game aborted banner */
-.game-aborted-banner {
-  width: 100%;
-  padding: 10px 16px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 8px;
-  color: #fca5a5;
-  font-weight: 600;
+/* Game ended message (replaces buttons) */
+.game-ended-message {
+  flex: 1;
   text-align: center;
-  margin-bottom: 8px;
+  padding: 10px 16px;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 999px;
+  color: #cbd5e1;
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 
 /* ---------- responsive ---------- */

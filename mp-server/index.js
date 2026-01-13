@@ -337,6 +337,49 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
   }
 });
 
+// Abort PEP match - broadcasts status to both players
+app.post("/api/games/:id/pep/abort", async (req, res) => {
+  const id = (req.params.id || "").trim();
+  const game = games.get(id);
+  if (!game) return res.status(404).json({ error: "Game not found." });
+
+  const { token } = req.body || {};
+  const seat = seatFromToken(game, token);
+  if (seat === "spectator") {
+    return res.status(403).json({ error: "Only players can abort." });
+  }
+
+  if (!game.pep.matchId) {
+    return res.status(400).json({ error: "No PEP match to abort." });
+  }
+
+  if (game.pep.status === "aborted") {
+    return res.status(400).json({ error: "Match already aborted." });
+  }
+
+  try {
+    const r = await _fetch(`${API_BASE}/api/matches/${game.pep.matchId}/abort`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await r.json();
+    if (!r.ok) return res.status(400).json({ error: data });
+
+    // Update game state and broadcast to both players
+    game.pep.status = "aborted";
+    game.status = "ended";
+    game.reason = "aborted";
+    game.result = "";
+    pauseClock(game);
+
+    broadcastState(game);
+    return res.json({ ok: true, ...data });
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to abort match" });
+  }
+});
+
 // ------------- Socket.io -------------
 io.on("connection", (socket) => {
   socket.on("join_game", ({ gameId, token }) => {
