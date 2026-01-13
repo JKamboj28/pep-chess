@@ -485,12 +485,16 @@ const onlineCaptured = useMemo(() => {
 const seat = (mpSeat ?? "").toLowerCase().trim();
 
 // Allow any player (white or black) to create PEP match - not just white
+// For online games, check server-side address flags (addresses are private)
+const bothAddressesSet = isOnline
+  ? (mpState?.pep?.whiteAddressSet && mpState?.pep?.blackAddressSet)
+  : (pepWhiteAddress && pepBlackAddress);
+
 const canCreatePepMatch =
   !pepMatchId &&
   !isPepMatchLocked &&
   pepStake &&
-  pepWhiteAddress &&
-  pepBlackAddress &&
+  bothAddressesSet &&
   (!isOnline || seat === "white" || seat === "black");
 
 // Check if any actual moves have been made (not just game status)
@@ -1173,8 +1177,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     if (pep.whiteEscrow) setPepWhiteEscrow(pep.whiteEscrow);
     if (pep.blackEscrow) setPepBlackEscrow(pep.blackEscrow);
     if (pep.stake) setPepStake(String(pep.stake));
-    if (pep.whiteAddress) setPepWhiteAddress(pep.whiteAddress);
-    if (pep.blackAddress) setPepBlackAddress(pep.blackAddress);
+    // Addresses are private - server only tells us if they're set
     if (pep.error) setPepError(pep.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline, mpState?.pep?.matchId, mpState?.pep?.whiteEscrow, mpState?.pep?.blackEscrow, mpState?.pep?.status]);
@@ -1185,13 +1188,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     const gid = params.get("game");
     const pep = params.get("pep");
 
-  const stake = params.get("stake");
-  const wp = params.get("wp");
-  const bp = params.get("bp");
-
-  if (stake) setPepStake(stake);
-  if (wp) setPepWhiteAddress(wp);
-  if (bp) setPepBlackAddress(bp);
+    // PEP info (stake, addresses) now synced via server socket, not URL params
 
     if (pep) {
       setPepMatchId(pep);
@@ -1348,6 +1345,12 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     socketRef.current.emit("decline_draw", { gameId: mpGameId, token: mpToken });
   }
 
+  // Send PEP info (stake/address) to server
+  function mpSetPepInfo(stake, address) {
+    if (!socketRef.current) return;
+    socketRef.current.emit("set_pep_info", { stake, address });
+  }
+
   // ---------------------------
   // PEP match create/abort (merged)
   // ---------------------------
@@ -1369,30 +1372,32 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         return;
       }
 
-      const whiteAddr = (pepWhiteAddress || "").trim();
-      const blackAddr = (pepBlackAddress || "").trim();
+      // For local games, validate addresses locally
+      // For online games, server already has addresses stored via set_pep_info
+      if (!isOnline) {
+        const whiteAddr = (pepWhiteAddress || "").trim();
+        const blackAddr = (pepBlackAddress || "").trim();
 
-      const whiteValid = isProbablyPepAddress(whiteAddr);
-      const blackValid = isProbablyPepAddress(blackAddr);
+        const whiteValid = isProbablyPepAddress(whiteAddr);
+        const blackValid = isProbablyPepAddress(blackAddr);
 
-      if (!whiteValid || !blackValid) {
-        setPepMatchStatus("error");
-        setPepInfoMessage("");
+        if (!whiteValid || !blackValid) {
+          setPepMatchStatus("error");
+          setPepInfoMessage("");
 
-        if (!whiteValid && !blackValid) {
-          setPepError("White and Black PEP addresses look invalid – please check both.");
-        } else if (!whiteValid) {
-          setPepError("White PEP address looks invalid – please check and try again.");
-        } else {
-          setPepError("Black PEP address looks invalid – please check and try again.");
+          if (!whiteValid && !blackValid) {
+            setPepError("White and Black PEP addresses look invalid – please check both.");
+          } else if (!whiteValid) {
+            setPepError("White PEP address looks invalid – please check and try again.");
+          } else {
+            setPepError("Black PEP address looks invalid – please check and try again.");
+          }
+          return;
         }
-        return;
-      }
 
-      // IMPORTANT:
-      // - If local: reset board to start when creating a PEP match (existing behaviour)
-      // - If online: do NOT reset locally (server owns the board)
-      if (!isOnline) resetBoardOnlyLocal();
+        // Reset board to start when creating a PEP match (local only)
+        resetBoardOnlyLocal();
+      }
 
       setPepPendingResetConfirm(false);
       setPepError("");
@@ -1419,20 +1424,17 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       let res;
       try {
         if (isOnline && mpGameId && mpToken) {
-          // ONLINE: Use mp-server endpoint so both players get synced via socket
+          // ONLINE: Use mp-server endpoint - server already has stake/addresses from set_pep_info
           res = await fetch(`${MP_URL}/api/games/${mpGameId}/pep/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: ctrl.signal,
-            body: JSON.stringify({
-              token: mpToken,
-              stake: stakeNum,
-              whiteAddress: whiteAddr,
-              blackAddress: blackAddr,
-            }),
+            body: JSON.stringify({ token: mpToken }),
           });
         } else {
-          // LOCAL: Use Python API directly
+          // LOCAL: Use Python API directly with local state
+          const whiteAddr = (pepWhiteAddress || "").trim();
+          const blackAddr = (pepBlackAddress || "").trim();
           res = await fetch(`${API_BASE_URL}/api/matches`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1904,12 +1906,10 @@ function renderCapturedRow(sideColor) {
 // near the top of CoreGame component with other hooks
 const [inviteCopied, setInviteCopied] = useState(false);
 
-// Build invite URL with stake and white address (Black will create the match)
+// Build invite URL - just gameId, PEP info is synced via server
 const inviteUrl =
   isOnline && mpGameId
-    ? `${window.location.origin}/?game=${mpGameId}` +
-      (pepStake ? `&stake=${encodeURIComponent(pepStake)}` : "") +
-      (pepWhiteAddress ? `&wp=${encodeURIComponent(pepWhiteAddress)}` : "")
+    ? `${window.location.origin}/?game=${mpGameId}`
     : "";
 
 const copyInvite = async () => {
@@ -2357,7 +2357,13 @@ const copyInvite = async () => {
                 value={pepStake}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) setPepStake(value);
+                  if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) {
+                    setPepStake(value);
+                    // Sync to server for online games
+                    if (isOnline && socketRef.current) {
+                      mpSetPepInfo(value ? Number(value) : null, undefined);
+                    }
+                  }
                 }}
                 disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && mpSeat !== "white")}
                 placeholder="0"
@@ -2367,29 +2373,63 @@ const copyInvite = async () => {
             {/* Only show address fields and Create button if stake > 0 and game hasn't started */}
             {parseFloat(pepStake) > 0 && !hasAnyGameMove && (
               <>
-                <div className="pep-field-row">
-                  <label className="pep-label">White PEP payout address</label>
-                  <input
-                    className="pep-input"
-                    type="text"
-                    value={pepWhiteAddress}
-                    onChange={(e) => setPepWhiteAddress(e.target.value)}
-                    disabled={isPepMatchLocked || (isOnline && mpSeat !== "white")}
-                    placeholder={isOnline && mpSeat !== "white" ? "Only White can enter this" : ""}
-                  />
-                </div>
+                {/* For online games: show only player's own address field */}
+                {isOnline ? (
+                  <>
+                    <div className="pep-field-row">
+                      <label className="pep-label">Your PEP payout address</label>
+                      <input
+                        className="pep-input"
+                        type="text"
+                        value={mpSeat === "white" ? pepWhiteAddress : pepBlackAddress}
+                        onChange={(e) => {
+                          const addr = e.target.value;
+                          if (mpSeat === "white") setPepWhiteAddress(addr);
+                          else setPepBlackAddress(addr);
+                          // Sync to server
+                          if (socketRef.current) {
+                            mpSetPepInfo(undefined, addr);
+                          }
+                        }}
+                        disabled={isPepMatchLocked}
+                        placeholder="Enter your Pepecoin address"
+                      />
+                    </div>
+                    {/* Show status of opponent's address */}
+                    <div className="pep-address-status">
+                      {mpSeat === "white"
+                        ? (mpState?.pep?.blackAddressSet ? "✓ Black has entered their address" : "Waiting for Black to enter their address...")
+                        : (mpState?.pep?.whiteAddressSet ? "✓ White has entered their address" : "Waiting for White to enter their address...")}
+                    </div>
+                  </>
+                ) : (
+                  /* For local games: show both address fields */
+                  <>
+                    <div className="pep-field-row">
+                      <label className="pep-label">White PEP payout address</label>
+                      <input
+                        className="pep-input"
+                        type="text"
+                        value={pepWhiteAddress}
+                        onChange={(e) => setPepWhiteAddress(e.target.value)}
+                        disabled={isPepMatchLocked}
+                        placeholder=""
+                      />
+                    </div>
 
-                <div className="pep-field-row">
-                  <label className="pep-label">Black PEP payout address</label>
-                  <input
-                    className="pep-input"
-                    type="text"
-                    value={pepBlackAddress}
-                    onChange={(e) => setPepBlackAddress(e.target.value)}
-                    disabled={isPepMatchLocked || (isOnline && mpSeat !== "black")}
-                    placeholder={isOnline && mpSeat !== "black" ? "Only Black can enter this" : ""}
-                  />
-                </div>
+                    <div className="pep-field-row">
+                      <label className="pep-label">Black PEP payout address</label>
+                      <input
+                        className="pep-input"
+                        type="text"
+                        value={pepBlackAddress}
+                        onChange={(e) => setPepBlackAddress(e.target.value)}
+                        disabled={isPepMatchLocked}
+                        placeholder=""
+                      />
+                    </div>
+                  </>
+                )}
 
                 <button
                   className="pep-button"

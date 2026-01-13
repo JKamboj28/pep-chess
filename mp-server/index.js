@@ -115,7 +115,18 @@ function stateFor(game) {
     drawOffer: game.drawOffer || null, // 'white'|'black'|null
     drawOfferCount: game.drawOfferCount || { white: 0, black: 0 },
 
-    pep: game.pep,
+    // PEP info - hide wallet addresses, only share stake and escrow addresses
+    pep: {
+      stake: game.pep.stake,
+      matchId: game.pep.matchId,
+      whiteEscrow: game.pep.whiteEscrow,
+      blackEscrow: game.pep.blackEscrow,
+      status: game.pep.status,
+      error: game.pep.error,
+      // Boolean flags so each side knows if address is set (without revealing it)
+      whiteAddressSet: !!game.pep.whiteAddress,
+      blackAddressSet: !!game.pep.blackAddress,
+    },
 
     // clock fields (top-level + nested for compatibility)
     whiteTimeMs: game.clock?.whiteMs ?? null,
@@ -262,12 +273,13 @@ app.post("/api/games/:id/join", (req, res) => {
 const API_BASE = process.env.PEPCHESS_API_URL || "http://127.0.0.1:8001";
 
 // Create PEP match (any player, but only once)
+// Uses stored addresses from set_pep_info - addresses are private to each player
 app.post("/api/games/:id/pep/create", async (req, res) => {
   const id = (req.params.id || "").trim();
   const game = games.get(id);
   if (!game) return res.status(404).json({ error: "Game not found." });
 
-  const { token, stake, whiteAddress, blackAddress } = req.body || {};
+  const { token } = req.body || {};
   const seat = seatFromToken(game, token);
   if (seat === "spectator") {
     return res.status(403).json({ error: "Only players can create the PEP match." });
@@ -278,8 +290,19 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
     return res.status(400).json({ error: "PEP match already exists." });
   }
 
-  if (!stake || !whiteAddress || !blackAddress) {
-    return res.status(400).json({ error: "stake, whiteAddress, blackAddress required" });
+  // Use stored addresses and stake (set via set_pep_info socket event)
+  const stake = game.pep.stake;
+  const whiteAddress = game.pep.whiteAddress;
+  const blackAddress = game.pep.blackAddress;
+
+  if (!stake || stake <= 0) {
+    return res.status(400).json({ error: "Stake must be set before creating PEP match." });
+  }
+  if (!whiteAddress) {
+    return res.status(400).json({ error: "White address not set. White player must enter their address." });
+  }
+  if (!blackAddress) {
+    return res.status(400).json({ error: "Black address not set. Black player must enter their address." });
   }
 
   if (!_fetch) {
@@ -299,10 +322,6 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
 
     const data = await r.json();
     if (!r.ok) return res.status(400).json({ error: data });
-
-    game.pep.stake = Number(stake);
-    game.pep.whiteAddress = whiteAddress;
-    game.pep.blackAddress = blackAddress;
     game.pep.matchId = data.matchId;
     game.pep.whiteEscrow = data.whiteEscrow;
     game.pep.blackEscrow = data.blackEscrow;
@@ -360,6 +379,38 @@ io.on("connection", (socket) => {
     if (!id) return null;
     return games.get(id) || null;
   }
+
+  // Set PEP info (stake and player's own wallet address)
+  socket.on("set_pep_info", ({ stake, address }) => {
+    const game = getBoundGame();
+    if (!game) return socket.emit("error_msg", { error: "Game not found." });
+
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") {
+      return socket.emit("error_msg", { error: "Only players can set PEP info." });
+    }
+
+    // Can't change PEP info once match is created
+    if (game.pep.matchId) {
+      return socket.emit("error_msg", { error: "Cannot change PEP info after match is created." });
+    }
+
+    // Update stake (any player can set/update before match creation)
+    if (stake !== undefined && stake !== null) {
+      game.pep.stake = Number(stake) || null;
+    }
+
+    // Update this player's address only
+    if (address !== undefined) {
+      if (seat === "white") {
+        game.pep.whiteAddress = address || null;
+      } else {
+        game.pep.blackAddress = address || null;
+      }
+    }
+
+    broadcastState(game);
+  });
 
   socket.on("move", ({ from, to, promotion }) => {
     const game = getBoundGame();
