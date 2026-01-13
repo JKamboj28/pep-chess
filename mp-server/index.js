@@ -113,6 +113,7 @@ function stateFor(game) {
     result: game.result || "",
     reason: game.reason || "",
     drawOffer: game.drawOffer || null, // 'white'|'black'|null
+    drawOfferCount: game.drawOfferCount || { white: 0, black: 0 },
 
     pep: game.pep,
 
@@ -202,6 +203,7 @@ app.post("/api/games", (req, res) => {
     },
     moves: [],
     drawOffer: null,
+    drawOfferCount: { white: 0, black: 0 }, // Track how many times each player offered a draw
     result: "",
     reason: "",
 
@@ -435,7 +437,14 @@ io.on("connection", (socket) => {
     if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
     if (game.status !== "playing") return;
 
+    // Check draw offer cap (3 per player)
+    const MAX_DRAW_OFFERS = 3;
+    if (game.drawOfferCount[seat] >= MAX_DRAW_OFFERS) {
+      return socket.emit("error_msg", { error: `You can only offer draw ${MAX_DRAW_OFFERS} times per game.` });
+    }
+
     game.drawOffer = seat;
+    game.drawOfferCount[seat]++;
     broadcastState(game);
   });
 

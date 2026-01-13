@@ -2276,13 +2276,35 @@ const copyInvite = async () => {
                 <button
                   className="control-btn"
                   onClick={() => {
-                    if (mpState?.drawOffer && mpState.drawOffer.by !== mpSeat) mpAcceptDraw();
+                    // drawOffer is stored as "white" or "black" string, not an object
+                    if (mpState?.drawOffer && mpState.drawOffer !== mpSeat) mpAcceptDraw();
                     else mpOfferDraw();
                   }}
-                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || !hasAnyGameMove}
-                  title={mpState?.drawOffer ? "Accept draw" : "Offer draw"}
+                  disabled={
+                    !mpIsPlayer ||
+                    !mpState ||
+                    mpState.status !== "playing" ||
+                    !hasAnyGameMove ||
+                    (mpState?.drawOffer === mpSeat) || // Can't click if you already offered
+                    (mpState?.drawOfferCount?.[mpSeat] >= 3 && !mpState?.drawOffer) // Max 3 offers
+                  }
+                  title={
+                    mpState?.drawOfferCount?.[mpSeat] >= 3 && !mpState?.drawOffer
+                      ? "No draw offers remaining"
+                      : mpState?.drawOffer === mpSeat
+                        ? "Waiting for opponent to respond"
+                        : mpState?.drawOffer
+                          ? "Accept draw"
+                          : `Offer draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)} left)`
+                  }
                 >
-                  {mpState?.drawOffer ? "Accept Draw" : "Offer Draw"}
+                  {mpState?.drawOffer === mpSeat
+                    ? "Draw Offered"
+                    : mpState?.drawOffer
+                      ? "Accept Draw"
+                      : mpState?.drawOfferCount?.[mpSeat] >= 3
+                        ? "No Offers Left"
+                        : `Offer Draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)})`}
                 </button>
                 {/* Show Abort/Abort & Refund before player's first move, Resign after */}
                 <button
