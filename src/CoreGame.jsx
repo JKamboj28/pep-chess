@@ -1025,7 +1025,20 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
 
     s.on("state", (st) => setMpState(st));
 
-    s.on("error_msg", (e) => setMpStatusMsg(`Server: ${e?.error || "error"}`));
+    s.on("error_msg", (e) => {
+      const errorMsg = e?.error || "error";
+      setMpStatusMsg(`Server: ${errorMsg}`);
+
+      // If game not found, clear the stale session so user can create a new game
+      if (errorMsg.toLowerCase().includes("not found")) {
+        clearMpSessionStorage();
+        setMpGameId("");
+        setMpToken("");
+        setMpSeat("spectator");
+        setMpState(null);
+        setLeftOnlineGame(false);
+      }
+    });
   }
 
   async function createMpGame() {
@@ -2267,8 +2280,8 @@ const copyInvite = async () => {
 
           {/* PEP match controls */}
           <div className="pep-panel">
-            {/* Show invite link when waiting for opponent to join */}
-            {isOnline && mpState?.status === "waiting" && mpSeat === "white" && inviteUrl && (
+            {/* Show invite link when waiting for opponent to join (show if no mpState yet or status is waiting) */}
+            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
               <div className="pep-invite-section" style={{ marginBottom: 12 }}>
                 <div className="pep-invite-label">Share this link with your opponent:</div>
                 <div className="pep-invite-row">
