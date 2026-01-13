@@ -1962,7 +1962,7 @@ const copyInvite = async () => {
     <div className="app-root">
       <h1 ref={titleRef} className="title">PEP Chess (Core Game)</h1>
 
-      {/* Multiplayer bar (same UI page) */}
+      {/* Top bar - simple status info */}
       <div
         style={{
           maxWidth: 1200,
@@ -1972,50 +1972,16 @@ const copyInvite = async () => {
           flexWrap: "wrap",
           alignItems: "center",
           padding: "0 0 14px 0",
+          justifyContent: "center",
         }}
       >
-        {/* <button
-          className="control-btn"
-          onClick={() => setMode("local")}
-          disabled={!isOnline}
-          title="Local mode"
-        >
-          Local
-        </button> */}
-
-        <button
-          className="control-btn"
-          onClick={() => setMode("online")}
-          disabled={isOnline}
-          title="Online mode"
-        >
-          Online
-        </button>
-
-        {/* Only show Create Game when not in a game (Leave button is below the board) */}
-        {!mpGameId && (
-          <button
-            className="control-btn"
-            onClick={createMpGame}
-            disabled={!isOnline}
-            title="Create a new online game"
-          >
-            Create Game
-          </button>
-        )}
-
-        <div style={{ marginLeft: "auto", fontFamily: "monospace", opacity: 0.9 }}>
-          {isOnline ? (
+        <div style={{ fontFamily: "monospace", opacity: 0.9 }}>
+          {mpGameId ? (
             <>
-              socket: <b>{mpConnected ? "connected" : "disconnected"}</b>{" "}
-              {mpGameId ? (
-                <>
-                  | game: <b>{mpGameId}</b> | seat: <b>{mpSeat}</b>
-                </>
-              ) : null}
+              Game: <b>{mpGameId}</b> | Seat: <b>{mpSeat}</b> | {mpConnected ? "Connected" : "Disconnected"}
             </>
           ) : (
-            <span>Local mode</span>
+            <span style={{ opacity: 0.7 }}>No active game</span>
           )}
         </div>
 
@@ -2060,29 +2026,20 @@ const copyInvite = async () => {
               <button className="reset-btn" onClick={leaveOnlineGame}>
                 Leave Game
               </button>
-            ) : leftOnlineGame ? (
-              <button
-                className="reset-btn"
-                onClick={() => {
-                  // Reset both local and online chess instances
-                  resetBoardOnlyLocal();
-                  mpChessRef.current = new Chess();
-                  setMode("local"); // Switch to local mode so board shows local position
-                  setLeftOnlineGame(false);
-                  setPepStake("");
-                  setMpStatusMsg("");
-                }}
-              >
-                Reset Game
-              </button>
             ) : (
               <button
                 className="reset-btn"
-                onClick={resetGameLocal}
-                disabled={!canResetLocal}
-                title={canResetLocal ? "" : "Reset is disabled while a game is in progress"}
+                onClick={() => {
+                  // Reset board and create new online game
+                  resetBoardOnlyLocal();
+                  mpChessRef.current = new Chess();
+                  setLeftOnlineGame(false);
+                  setPepStake("");
+                  setMpStatusMsg("");
+                  createMpGame(); // Create new online game immediately
+                }}
               >
-                Reset Game
+                New Game
               </button>
             )}
           </div>
