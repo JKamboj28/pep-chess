@@ -687,6 +687,32 @@ body {
   text-align: center;
 }
 
+/* Invite section in PEP panel */
+.pep-invite-section {
+  margin: 8px 0;
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+}
+
+.pep-invite-label {
+  font-size: 0.85rem;
+  color: #93c5fd;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.pep-invite-row {
+  display: flex;
+  gap: 6px;
+}
+
+.pep-invite-input {
+  flex: 1;
+  font-size: 0.75rem;
+}
+
 .pep-button {
   width: 100%;
   margin-top: 4px;
@@ -914,6 +940,12 @@ body {
   margin-top: 4px;
   font-size: 11px;
   color: #f9a825; /* yellow-ish warning */
+}
+
+.pep-success-line {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #4ade80; /* green success */
 }
 
 /* ---------- responsive ---------- */

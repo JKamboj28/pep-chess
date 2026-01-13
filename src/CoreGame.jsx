@@ -2395,12 +2395,38 @@ const copyInvite = async () => {
                         placeholder="Enter your Pepecoin address"
                       />
                     </div>
-                    {/* Show status of opponent's address */}
-                    <div className="pep-address-status">
-                      {mpSeat === "white"
-                        ? (mpState?.pep?.blackAddressSet ? "✓ Black has entered their address" : "Waiting for Black to enter their address...")
-                        : (mpState?.pep?.whiteAddressSet ? "✓ White has entered their address" : "Waiting for White to enter their address...")}
-                    </div>
+
+                    {/* Show invite link prominently when waiting for opponent to join */}
+                    {mpState?.status === "waiting" && mpSeat === "white" && inviteUrl && (
+                      <div className="pep-invite-section">
+                        <div className="pep-invite-label">Share this link with your opponent:</div>
+                        <div className="pep-invite-row">
+                          <input
+                            className="pep-input pep-invite-input"
+                            type="text"
+                            value={inviteUrl}
+                            readOnly
+                            onClick={(e) => e.target.select()}
+                          />
+                          <button
+                            className="copy-invite-btn"
+                            onClick={copyInvite}
+                            type="button"
+                          >
+                            {inviteCopied ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show status of opponent's address (only after they've joined) */}
+                    {mpState?.status !== "waiting" && (
+                      <div className="pep-address-status">
+                        {mpSeat === "white"
+                          ? (mpState?.pep?.blackAddressSet ? "✓ Black has entered their address" : "Waiting for Black to enter their address...")
+                          : (mpState?.pep?.whiteAddressSet ? "✓ White has entered their address" : "Waiting for White to enter their address...")}
+                      </div>
+                    )}
                   </>
                 ) : (
                   /* For local games: show both address fields */
@@ -2522,9 +2548,42 @@ const copyInvite = async () => {
                         Black overpaid; extra will be refunded.
                       </div>
                     )}
+                    {pepWhiteExtraRefunded && pepWhiteExtraAmount > 0 && (
+                      <div className="pep-success-line">
+                        White's extra {pepWhiteExtraAmount.toFixed(2)} PEP has been refunded.
+                      </div>
+                    )}
+                    {pepBlackExtraRefunded && pepBlackExtraAmount > 0 && (
+                      <div className="pep-success-line">
+                        Black's extra {pepBlackExtraAmount.toFixed(2)} PEP has been refunded.
+                      </div>
+                    )}
                   </>
                 )}
               </>
+            )}
+
+            {/* Show invite link for free games (no stake) when waiting for opponent */}
+            {isOnline && mpState?.status === "waiting" && mpSeat === "white" && !parseFloat(pepStake) && inviteUrl && (
+              <div className="pep-invite-section">
+                <div className="pep-invite-label">Share this link with your opponent:</div>
+                <div className="pep-invite-row">
+                  <input
+                    className="pep-input pep-invite-input"
+                    type="text"
+                    value={inviteUrl}
+                    readOnly
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    className="copy-invite-btn"
+                    onClick={copyInvite}
+                    type="button"
+                  >
+                    {inviteCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Always show PEP messages if they exist */}
