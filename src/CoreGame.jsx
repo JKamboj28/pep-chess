@@ -2267,6 +2267,29 @@ const copyInvite = async () => {
 
           {/* PEP match controls */}
           <div className="pep-panel">
+            {/* Show invite link when waiting for opponent to join */}
+            {isOnline && mpState?.status === "waiting" && mpSeat === "white" && inviteUrl && (
+              <div className="pep-invite-section" style={{ marginBottom: 12 }}>
+                <div className="pep-invite-label">Share this link with your opponent:</div>
+                <div className="pep-invite-row">
+                  <input
+                    className="pep-input pep-invite-input"
+                    type="text"
+                    value={inviteUrl}
+                    readOnly
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    className="copy-invite-btn"
+                    onClick={copyInvite}
+                    type="button"
+                  >
+                    {inviteCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             <h2 className="pep-title">PEP Stake (optional)</h2>
             <p className="pep-subtitle">
               Stake PEP to play for real money. Winner takes the pot from escrow.
@@ -2321,29 +2344,6 @@ const copyInvite = async () => {
                         placeholder="Enter your Pepecoin address"
                       />
                     </div>
-
-                    {/* Show invite link prominently when waiting for opponent to join */}
-                    {mpState?.status === "waiting" && mpSeat === "white" && inviteUrl && (
-                      <div className="pep-invite-section">
-                        <div className="pep-invite-label">Share this link with your opponent:</div>
-                        <div className="pep-invite-row">
-                          <input
-                            className="pep-input pep-invite-input"
-                            type="text"
-                            value={inviteUrl}
-                            readOnly
-                            onClick={(e) => e.target.select()}
-                          />
-                          <button
-                            className="copy-invite-btn"
-                            onClick={copyInvite}
-                            type="button"
-                          >
-                            {inviteCopied ? "Copied!" : "Copy"}
-                          </button>
-                        </div>
-                      </div>
-                    )}
 
                     {/* Show status of opponent's address (only after they've joined) */}
                     {mpState?.status !== "waiting" && (
@@ -2487,29 +2487,6 @@ const copyInvite = async () => {
                   </>
                 )}
               </>
-            )}
-
-            {/* Show invite link for free games (no stake) when waiting for opponent */}
-            {isOnline && mpState?.status === "waiting" && mpSeat === "white" && !parseFloat(pepStake) && inviteUrl && (
-              <div className="pep-invite-section">
-                <div className="pep-invite-label">Share this link with your opponent:</div>
-                <div className="pep-invite-row">
-                  <input
-                    className="pep-input pep-invite-input"
-                    type="text"
-                    value={inviteUrl}
-                    readOnly
-                    onClick={(e) => e.target.select()}
-                  />
-                  <button
-                    className="copy-invite-btn"
-                    onClick={copyInvite}
-                    type="button"
-                  >
-                    {inviteCopied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
             )}
 
             {/* Always show PEP messages if they exist */}
