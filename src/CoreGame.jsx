@@ -1343,6 +1343,11 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     socketRef.current.emit("accept_draw", { gameId: mpGameId, token: mpToken });
   }
 
+  function mpDeclineDraw() {
+    if (!socketRef.current) return;
+    socketRef.current.emit("decline_draw", { gameId: mpGameId, token: mpToken });
+  }
+
   // ---------------------------
   // PEP match create/abort (merged)
   // ---------------------------
@@ -2273,39 +2278,55 @@ const copyInvite = async () => {
               )
             ) : (
               <>
-                <button
-                  className="control-btn"
-                  onClick={() => {
-                    // drawOffer is stored as "white" or "black" string, not an object
-                    if (mpState?.drawOffer && mpState.drawOffer !== mpSeat) mpAcceptDraw();
-                    else mpOfferDraw();
-                  }}
-                  disabled={
-                    !mpIsPlayer ||
-                    !mpState ||
-                    mpState.status !== "playing" ||
-                    !hasAnyGameMove ||
-                    (mpState?.drawOffer === mpSeat) || // Can't click if you already offered
-                    (mpState?.drawOfferCount?.[mpSeat] >= 3 && !mpState?.drawOffer) // Max 3 offers
-                  }
-                  title={
-                    mpState?.drawOfferCount?.[mpSeat] >= 3 && !mpState?.drawOffer
-                      ? "No draw offers remaining"
-                      : mpState?.drawOffer === mpSeat
-                        ? "Waiting for opponent to respond"
-                        : mpState?.drawOffer
-                          ? "Accept draw"
+{/* Draw controls - show Accept/Decline when opponent offers, otherwise show Offer button */}
+                {mpState?.drawOffer && mpState.drawOffer !== mpSeat ? (
+                  // Opponent offered draw - show Accept/Decline buttons
+                  <div className="draw-response-buttons">
+                    <button
+                      className="control-btn draw-accept-btn"
+                      onClick={mpAcceptDraw}
+                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                      title="Accept draw"
+                    >
+                      ✓ Accept
+                    </button>
+                    <button
+                      className="control-btn draw-decline-btn"
+                      onClick={mpDeclineDraw}
+                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                      title="Decline draw"
+                    >
+                      ✕ Decline
+                    </button>
+                  </div>
+                ) : (
+                  // Normal state - show Offer Draw button
+                  <button
+                    className="control-btn draw-offer-btn"
+                    onClick={mpOfferDraw}
+                    disabled={
+                      !mpIsPlayer ||
+                      !mpState ||
+                      mpState.status !== "playing" ||
+                      !hasAnyGameMove ||
+                      (mpState?.drawOffer === mpSeat) || // Can't click if you already offered
+                      (mpState?.drawOfferCount?.[mpSeat] >= 3) // Max 3 offers
+                    }
+                    title={
+                      mpState?.drawOfferCount?.[mpSeat] >= 3
+                        ? "No draw offers remaining"
+                        : mpState?.drawOffer === mpSeat
+                          ? "Waiting for opponent to respond"
                           : `Offer draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)} left)`
-                  }
-                >
-                  {mpState?.drawOffer === mpSeat
-                    ? "Draw Offered"
-                    : mpState?.drawOffer
-                      ? "Accept Draw"
+                    }
+                  >
+                    {mpState?.drawOffer === mpSeat
+                      ? "Draw Offered"
                       : mpState?.drawOfferCount?.[mpSeat] >= 3
                         ? "No Offers Left"
                         : `Offer Draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)})`}
-                </button>
+                  </button>
+                )}
                 {/* Show Abort/Abort & Refund before player's first move, Resign after */}
                 <button
                   className="control-btn control-btn-resign"

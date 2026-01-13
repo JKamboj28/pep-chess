@@ -469,6 +469,23 @@ io.on("connection", (socket) => {
     broadcastState(game);
   });
 
+  socket.on("decline_draw", () => {
+    const game = getBoundGame();
+    if (!game) return socket.emit("error_msg", { error: "Game not found." });
+
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
+    if (game.status !== "playing") return;
+
+    // Can only decline if there's an offer from opponent
+    if (!game.drawOffer || game.drawOffer === seat) {
+      return socket.emit("error_msg", { error: "No opponent draw offer to decline." });
+    }
+
+    game.drawOffer = null;
+    broadcastState(game);
+  });
+
   socket.on("resign", () => {
     const game = getBoundGame();
     if (!game) return socket.emit("error_msg", { error: "Game not found." });

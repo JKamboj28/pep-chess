@@ -512,6 +512,42 @@ body {
   background: #dc2626;
 }
 
+/* Draw offer button - amber/gold color */
+.draw-offer-btn {
+  background: #b45309;
+}
+
+.draw-offer-btn:hover:not(:disabled) {
+  background: #d97706;
+}
+
+/* Draw response buttons container */
+.draw-response-buttons {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Accept draw button - green */
+.draw-accept-btn {
+  flex: 1;
+  background: #15803d;
+}
+
+.draw-accept-btn:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+/* Decline draw button - muted red/gray */
+.draw-decline-btn {
+  flex: 1;
+  background: #6b7280;
+}
+
+.draw-decline-btn:hover:not(:disabled) {
+  background: #9ca3af;
+}
+
 .confirm-overlay {
   position: fixed;
   inset: 0;
