@@ -1981,49 +1981,26 @@ const copyInvite = async () => {
           Online
         </button>
 
-        <button
-          className="control-btn"
-          onClick={createMpGame}
-          disabled={!isOnline}
-          title="Create a new online game"
-        >
-          Create Online Game
-        </button>
-
-        <input
-          value={mpJoinInput}
-          onChange={(e) => setMpJoinInput(e.target.value)}
-          placeholder="Enter gameId to join"
-          style={{
-            height: 36,
-            padding: "0 10px",
-            borderRadius: 8,
-            border: "1px solid rgba(255,255,255,0.15)",
-            background: "rgba(0,0,0,0.25)",
-            color: "white",
-            outline: "none",
-            width: 220,
-          }}
-          disabled={!isOnline}
-        />
-
-        <button
-          className="control-btn"
-          onClick={() => joinMpGameById(mpJoinInput)}
-          disabled={!isOnline}
-          title="Join by gameId"
-        >
-          Join
-        </button>
-
-        <button
-          className="control-btn control-btn-resign"
-          onClick={leaveOnlineGame}
-          disabled={!isOnline}
-          title="Leave online game"
-        >
-          Leave Online
-        </button>
+        {/* Show Create Game when not in a game, Leave when in a game */}
+        {!mpGameId ? (
+          <button
+            className="control-btn"
+            onClick={createMpGame}
+            disabled={!isOnline}
+            title="Create a new online game"
+          >
+            Create Game
+          </button>
+        ) : (
+          <button
+            className="control-btn control-btn-resign"
+            onClick={leaveOnlineGame}
+            disabled={!isOnline}
+            title="Leave online game"
+          >
+            Leave Game
+          </button>
+        )}
 
         <div style={{ marginLeft: "auto", fontFamily: "monospace", opacity: 0.9 }}>
           {isOnline ? (
@@ -2039,34 +2016,6 @@ const copyInvite = async () => {
             <span>Local mode</span>
           )}
         </div>
-
-        {isOnline && inviteUrl && (
-          <div
-            style={{
-              width: "100%",
-              fontFamily: "monospace",
-              opacity: 0.9,
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <span>Invite:</span>
-
-            <a href={inviteUrl} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
-              {inviteUrl}
-            </a>
-
-            <button
-              className="copy-invite-btn"
-              onClick={copyInvite}
-              type="button"
-            >
-              {inviteCopied ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        )}
 
         {isOnline && mpStatusMsg && (
           <div style={{ width: "100%", fontFamily: "monospace", opacity: 0.85 }}>
@@ -2254,6 +2203,13 @@ const copyInvite = async () => {
             {renderCapturedRow((isOnline && seat === "black") ? "b" : "w")}
           </div>
 
+          {/* Show aborted message if PEP match was aborted */}
+          {pepMatchStatus === "aborted" && (
+            <div className="game-aborted-banner">
+              Match Aborted - All deposits have been refunded
+            </div>
+          )}
+
           {/* Draw / resign controls */}
           <div className="controls-row">
             {!isOnline ? (
@@ -2285,7 +2241,7 @@ const copyInvite = async () => {
                     <button
                       className="control-btn draw-accept-btn"
                       onClick={mpAcceptDraw}
-                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || pepMatchStatus === "aborted"}
                       title="Accept draw"
                     >
                       ✓ Accept
@@ -2293,7 +2249,7 @@ const copyInvite = async () => {
                     <button
                       className="control-btn draw-decline-btn"
                       onClick={mpDeclineDraw}
-                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                      disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || pepMatchStatus === "aborted"}
                       title="Decline draw"
                     >
                       ✕ Decline
@@ -2308,16 +2264,19 @@ const copyInvite = async () => {
                       !mpIsPlayer ||
                       !mpState ||
                       mpState.status !== "playing" ||
+                      pepMatchStatus === "aborted" ||
                       !hasAnyGameMove ||
                       (mpState?.drawOffer === mpSeat) || // Can't click if you already offered
                       (mpState?.drawOfferCount?.[mpSeat] >= 3) // Max 3 offers
                     }
                     title={
-                      mpState?.drawOfferCount?.[mpSeat] >= 3
-                        ? "No draw offers remaining"
-                        : mpState?.drawOffer === mpSeat
-                          ? "Waiting for opponent to respond"
-                          : `Offer draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)} left)`
+                      pepMatchStatus === "aborted"
+                        ? "Match was aborted"
+                        : mpState?.drawOfferCount?.[mpSeat] >= 3
+                          ? "No draw offers remaining"
+                          : mpState?.drawOffer === mpSeat
+                            ? "Waiting for opponent to respond"
+                            : `Offer draw (${3 - (mpState?.drawOfferCount?.[mpSeat] || 0)} left)`
                     }
                   >
                     {mpState?.drawOffer === mpSeat
@@ -2331,7 +2290,7 @@ const copyInvite = async () => {
                 <button
                   className="control-btn control-btn-resign"
                   onClick={currentPlayerHasMoved ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
-                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing"}
+                  disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || pepMatchStatus === "aborted"}
                 >
                   {currentPlayerHasMoved ? "Resign" : (pepMatchId ? "Abort & Refund" : "Abort")}
                 </button>
