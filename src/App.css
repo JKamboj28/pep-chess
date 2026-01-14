@@ -699,13 +699,12 @@ body {
 .color-pref-icon {
   font-size: 28px;
   line-height: 1;
-  /* Add dark outline for white pieces to be visible */
-  text-shadow:
-    -1px -1px 0 #000,
-    1px -1px 0 #000,
-    -1px 1px 0 #000,
-    1px 1px 0 #000,
-    0 0 4px rgba(0,0,0,0.5);
+}
+
+.color-pref-piece {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
 }
 
 /* Time Control Selector */

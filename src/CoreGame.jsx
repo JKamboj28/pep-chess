@@ -2338,7 +2338,7 @@ const copyInvite = async () => {
                   onClick={() => setSelectedColorPref("white")}
                   title="Play as White"
                 >
-                  <span className="color-pref-icon">♔</span>
+                  <img src="/pieces/cburnett/wK.svg" alt="White" className="color-pref-piece" />
                 </button>
                 <button
                   className={`color-pref-btn color-pref-btn-random ${selectedColorPref === "random" ? "color-pref-btn-selected" : ""}`}
@@ -2352,7 +2352,7 @@ const copyInvite = async () => {
                   onClick={() => setSelectedColorPref("black")}
                   title="Play as Black"
                 >
-                  <span className="color-pref-icon">♚</span>
+                  <img src="/pieces/cburnett/bK.svg" alt="Black" className="color-pref-piece" />
                 </button>
               </div>
             </div>
@@ -2434,7 +2434,7 @@ const copyInvite = async () => {
                 type="number"
                 min="0"
                 step="1"
-                value={pepStake}
+                value={pepStake || (mpState?.pep?.stake ?? "")}
                 onChange={(e) => {
                   const value = e.target.value;
                   if (value === "" || /^\d*(\.\d{0,2})?$/.test(value)) {
@@ -2451,7 +2451,8 @@ const copyInvite = async () => {
             </div>
 
             {/* Only show address fields and Create button if stake > 0 and game hasn't started */}
-            {parseFloat(pepStake) > 0 && !hasAnyGameMove && (
+            {/* Check both local pepStake (for creator) and server state (for joiner) */}
+            {(parseFloat(pepStake) > 0 || (mpState?.pep?.stake && mpState.pep.stake > 0)) && !hasAnyGameMove && (
               <>
                 {/* For online games: show only player's own address field */}
                 {isOnline ? (
