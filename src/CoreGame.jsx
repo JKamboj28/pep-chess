@@ -2412,7 +2412,7 @@ const copyInvite = async () => {
                     }
                   }
                 }}
-                disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && mpSeat !== "white")}
+                disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && mpState?.status !== "waiting")}
                 placeholder="0"
               />
             </div>
@@ -2495,7 +2495,7 @@ const copyInvite = async () => {
             )}
 
             {/* Show invite link when waiting for opponent (at the bottom after all setup) */}
-            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
+            {isOnline && mpIsPlayer && inviteUrl && (!mpState || mpState.status === "waiting") && (
               <div className="pep-invite-section">
                 <div className="pep-invite-label">Share this link with your opponent:</div>
                 <div className="pep-invite-row">
