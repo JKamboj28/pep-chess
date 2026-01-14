@@ -382,6 +382,7 @@ function App() {
   const [mpCheckSquare, setMpCheckSquare] = useState(null);
   const [mpMoveRows, setMpMoveRows] = useState([]);
   const [leftOnlineGame, setLeftOnlineGame] = useState(false); // Track if we just left an online game
+  const [leftAsSeat, setLeftAsSeat] = useState(null); // Track what seat user was when they left (for UI logic)
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -1079,6 +1080,9 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
   }
 
   function leaveOnlineGame() {
+    // Remember what seat we were before clearing (for UI logic)
+    setLeftAsSeat(mpSeat);
+
     clearMpSessionStorage();
     disconnectSocket();
 
@@ -2039,6 +2043,9 @@ const copyInvite = async () => {
               <button className="reset-btn" onClick={leaveOnlineGame}>
                 Leave Game
               </button>
+            ) : leftAsSeat === "black" ? (
+              // Black left the game - don't show New Game button that makes them white
+              <span className="left-game-msg">Left the game</span>
             ) : (
               <button
                 className="reset-btn"
@@ -2047,6 +2054,7 @@ const copyInvite = async () => {
                   resetBoardOnlyLocal();
                   mpChessRef.current = new Chess();
                   setLeftOnlineGame(false);
+                  setLeftAsSeat(null);
                   setPepStake("");
                   setMpStatusMsg("");
                   createMpGame(); // Create new online game immediately
@@ -2280,29 +2288,6 @@ const copyInvite = async () => {
 
           {/* PEP match controls */}
           <div className="pep-panel">
-            {/* Show invite link when waiting for opponent to join (show if no mpState yet or status is waiting) */}
-            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
-              <div className="pep-invite-section" style={{ marginBottom: 12 }}>
-                <div className="pep-invite-label">Share this link with your opponent:</div>
-                <div className="pep-invite-row">
-                  <input
-                    className="pep-input pep-invite-input"
-                    type="text"
-                    value={inviteUrl}
-                    readOnly
-                    onClick={(e) => e.target.select()}
-                  />
-                  <button
-                    className="copy-invite-btn"
-                    onClick={copyInvite}
-                    type="button"
-                  >
-                    {inviteCopied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
-            )}
-
             <h2 className="pep-title">PEP Stake (optional)</h2>
             <p className="pep-subtitle">
               Stake PEP to play for real money. Winner takes the pot from escrow.
@@ -2331,6 +2316,29 @@ const copyInvite = async () => {
                 placeholder="0"
               />
             </div>
+
+            {/* Show invite link when waiting for opponent (after stake setup) */}
+            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
+              <div className="pep-invite-section">
+                <div className="pep-invite-label">Share this link with your opponent:</div>
+                <div className="pep-invite-row">
+                  <input
+                    className="pep-input pep-invite-input"
+                    type="text"
+                    value={inviteUrl}
+                    readOnly
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    className="copy-invite-btn"
+                    onClick={copyInvite}
+                    type="button"
+                  >
+                    {inviteCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Only show address fields and Create button if stake > 0 and game hasn't started */}
             {parseFloat(pepStake) > 0 && !hasAnyGameMove && (

@@ -185,6 +185,12 @@ body {
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
+.left-game-msg {
+  font-size: 13px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
 /* Copy invite button */
 .copy-invite-btn {
   padding: 6px 14px;
