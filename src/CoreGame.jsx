@@ -2385,29 +2385,6 @@ const copyInvite = async () => {
               />
             </div>
 
-            {/* Show invite link when waiting for opponent (after stake setup) */}
-            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
-              <div className="pep-invite-section">
-                <div className="pep-invite-label">Share this link with your opponent:</div>
-                <div className="pep-invite-row">
-                  <input
-                    className="pep-input pep-invite-input"
-                    type="text"
-                    value={inviteUrl}
-                    readOnly
-                    onClick={(e) => e.target.select()}
-                  />
-                  <button
-                    className="copy-invite-btn"
-                    onClick={copyInvite}
-                    type="button"
-                  >
-                    {inviteCopied ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Only show address fields and Create button if stake > 0 and game hasn't started */}
             {parseFloat(pepStake) > 0 && !hasAnyGameMove && (
               <>
@@ -2480,6 +2457,29 @@ const copyInvite = async () => {
                   {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
                 </button>
               </>
+            )}
+
+            {/* Show invite link when waiting for opponent (at the bottom after all setup) */}
+            {isOnline && mpSeat === "white" && inviteUrl && (!mpState || mpState.status === "waiting") && (
+              <div className="pep-invite-section">
+                <div className="pep-invite-label">Share this link with your opponent:</div>
+                <div className="pep-invite-row">
+                  <input
+                    className="pep-input pep-invite-input"
+                    type="text"
+                    value={inviteUrl}
+                    readOnly
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    className="copy-invite-btn"
+                    onClick={copyInvite}
+                    type="button"
+                  >
+                    {inviteCopied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              </div>
             )}
 
             {/* Escrow addresses and status - only show when stake > 0 and PEP match exists */}
