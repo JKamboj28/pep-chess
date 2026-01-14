@@ -646,6 +646,52 @@ body {
   overflow: hidden; /* prevent page overflow */
 }
 
+/* Color Preference Selector */
+.color-pref-panel {
+  margin-bottom: 12px;
+}
+
+.color-pref-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.color-pref-btn {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 41, 59, 0.8);
+  border: 2px solid rgba(71, 85, 105, 0.5);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.color-pref-btn:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: rgba(100, 116, 139, 0.7);
+  transform: scale(1.05);
+}
+
+.color-pref-btn-selected {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.8);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+.color-pref-btn-selected:hover {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 1);
+}
+
+.color-pref-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
 /* Time Control Selector */
 .time-control-panel {
   margin-bottom: 12px;

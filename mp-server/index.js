@@ -200,7 +200,7 @@ function broadcastState(game) {
 // ------------- HTTP -------------
 app.get("/health", (_, res) => res.json({ ok: true }));
 
-// Create a new online game (creator becomes white)
+// Create a new online game
 app.post("/api/games", (req, res) => {
   const id = newGameId();
 
@@ -208,14 +208,23 @@ app.post("/api/games", (req, res) => {
   const timeMs = Number(req.body?.timeMs) || INITIAL_CLOCK_MS;
   const incrementMs = Number(req.body?.incrementMs) || 0;
 
+  // Accept color preference from client (default to "white")
+  let colorPref = req.body?.colorPref || "white";
+  if (colorPref === "random") {
+    colorPref = Math.random() < 0.5 ? "white" : "black";
+  }
+  const creatorColor = colorPref === "black" ? "black" : "white";
+  const joinerColor = creatorColor === "white" ? "black" : "white";
+
   const game = {
     id,
     createdAt: nowMs(),
     status: "waiting",
     chess: new Chess(),
+    creatorColor, // Store which color the creator chose
     tokens: {
-      white: newToken(),
-      black: null,
+      white: creatorColor === "white" ? newToken() : null,
+      black: creatorColor === "black" ? newToken() : null,
     },
     connected: {
       white: false,
@@ -253,28 +262,37 @@ app.post("/api/games", (req, res) => {
 
   res.json({
     gameId: id,
-    token: game.tokens.white,
-    color: "white",
+    token: game.tokens[creatorColor],
+    color: creatorColor,
     state: stateFor(game),
   });
 });
 
-// Join an existing game (joiner becomes black)
+// Join an existing game (joiner gets the remaining color)
 app.post("/api/games/:id/join", (req, res) => {
   const id = (req.params.id || "").trim();
   const game = games.get(id);
 
   if (!game) return res.json({ error: "Game not found." });
-  if (game.tokens.black) return res.json({ error: "Game already has 2 players." });
 
-  game.tokens.black = newToken();
+  // Find which color is available (the one without a token)
+  let joinerColor;
+  if (!game.tokens.white) {
+    joinerColor = "white";
+  } else if (!game.tokens.black) {
+    joinerColor = "black";
+  } else {
+    return res.json({ error: "Game already has 2 players." });
+  }
+
+  game.tokens[joinerColor] = newToken();
   game.status = "playing";
  // startClockIfReady(game);
 
   res.json({
     gameId: game.id,
-    token: game.tokens.black,
-    color: "black",
+    token: game.tokens[joinerColor],
+    color: joinerColor,
     state: stateFor(game),
   });
 

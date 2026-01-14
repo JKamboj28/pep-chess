@@ -404,6 +404,7 @@ function App() {
   const [leftOnlineGame, setLeftOnlineGame] = useState(false); // Track if we just left an online game
   const [leftAsSeat, setLeftAsSeat] = useState(null); // Track what seat user was when they left (for UI logic)
   const [selectedTimeControl, setSelectedTimeControl] = useState(DEFAULT_TIME_CONTROL);
+  const [selectedColorPref, setSelectedColorPref] = useState("white"); // "white", "black", or "random"
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -1072,6 +1073,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       body: JSON.stringify({
         timeMs: selectedTimeControl.timeMs,
         incrementMs: selectedTimeControl.incrementMs,
+        colorPref: selectedColorPref, // "white", "black", or "random"
       }),
     });
     const data = await r.json();
@@ -2314,6 +2316,36 @@ const copyInvite = async () => {
             )}
           </div>
 
+          {/* Color Preference Selector - only show before game is created */}
+          {!mpGameId && (
+            <div className="color-pref-panel">
+              <h2 className="pep-title">Play As</h2>
+              <div className="color-pref-buttons">
+                <button
+                  className={`color-pref-btn ${selectedColorPref === "white" ? "color-pref-btn-selected" : ""}`}
+                  onClick={() => setSelectedColorPref("white")}
+                  title="Play as White"
+                >
+                  <span className="color-pref-icon">♔</span>
+                </button>
+                <button
+                  className={`color-pref-btn color-pref-btn-random ${selectedColorPref === "random" ? "color-pref-btn-selected" : ""}`}
+                  onClick={() => setSelectedColorPref("random")}
+                  title="Random color"
+                >
+                  <span className="color-pref-icon">🎲</span>
+                </button>
+                <button
+                  className={`color-pref-btn ${selectedColorPref === "black" ? "color-pref-btn-selected" : ""}`}
+                  onClick={() => setSelectedColorPref("black")}
+                  title="Play as Black"
+                >
+                  <span className="color-pref-icon">♚</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Time Control Selector */}
           <div className="time-control-panel">
             <h2 className="pep-title">Time Control</h2>
@@ -2449,13 +2481,16 @@ const copyInvite = async () => {
                   </>
                 )}
 
-                <button
-                  className="pep-button"
-                  onClick={createPepMatch}
-                  disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
-                >
-                  {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
-                </button>
+                {/* Only show Create PEP match button for local games */}
+                {!isOnline && (
+                  <button
+                    className="pep-button"
+                    onClick={createPepMatch}
+                    disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
+                  >
+                    {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
+                  </button>
+                )}
               </>
             )}
 
