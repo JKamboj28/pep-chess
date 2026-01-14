@@ -2071,7 +2071,7 @@ const copyInvite = async () => {
           <div className="clock-block">
             {(isOnline && seat === "black") ? (
               // Black player sees White clock at top
-              <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
+              <div className={"clock" + (whiteClockActive ? " clock-active" : "") + (onlineWhiteMs < 60000 ? " clock-low" : "")}>
                 <span className="clock-label">
                   WHITE
                   {mpState?.players?.white && (
@@ -2084,7 +2084,7 @@ const copyInvite = async () => {
               </div>
             ) : (
               // White player (or local) sees Black clock at top
-              <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
+              <div className={"clock" + (blackClockActive ? " clock-active" : "") + ((isOnline ? onlineBlackMs : blackTime) < 60000 ? " clock-low" : "")}>
                 <span className="clock-label">
                   BLACK
                   {isOnline && mpState?.players?.black && (
@@ -2155,7 +2155,7 @@ const copyInvite = async () => {
           <div className="clock-block">
             {(isOnline && seat === "black") ? (
               // Black player sees their clock at bottom
-              <div className={"clock" + (blackClockActive ? " clock-active" : "")}>
+              <div className={"clock" + (blackClockActive ? " clock-active" : "") + (onlineBlackMs < 60000 ? " clock-low" : "")}>
                 <span className="clock-label">
                   BLACK
                   {mpState?.players?.black && (
@@ -2168,7 +2168,7 @@ const copyInvite = async () => {
               </div>
             ) : (
               // White player (or local) sees White clock at bottom
-              <div className={"clock" + (whiteClockActive ? " clock-active" : "")}>
+              <div className={"clock" + (whiteClockActive ? " clock-active" : "") + ((isOnline ? onlineWhiteMs : whiteTime) < 60000 ? " clock-low" : "")}>
                 <span className="clock-label">
                   WHITE
                   {isOnline && mpState?.players?.white && (

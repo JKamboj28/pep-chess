@@ -359,6 +359,25 @@ body {
   opacity: 0.7;
 }
 
+/* Low time warning (< 1 minute) */
+.clock-low {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.clock-low .clock-time {
+  color: #f87171;
+}
+
+.clock-low.clock-active {
+  background: #ef4444;
+  color: #fff;
+}
+
+.clock-low.clock-active .clock-time {
+  color: #fff;
+}
+
 /* Move list */
 
 .moves-panel {
