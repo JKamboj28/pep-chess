@@ -48,9 +48,12 @@ function seatFromToken(game, token) {
 // ---------------- Clock helpers ----------------
 function ensureClock(game) {
   if (game.clock) return;
+  // Fallback if clock wasn't initialized (shouldn't happen)
   game.clock = {
     whiteMs: INITIAL_CLOCK_MS,
     blackMs: INITIAL_CLOCK_MS,
+    initialMs: INITIAL_CLOCK_MS,
+    incrementMs: 0,
     running: false,
     active: "w", // 'w' | 'b'
     lastTs: null,
@@ -135,6 +138,8 @@ function stateFor(game) {
       ? {
           whiteMs: game.clock.whiteMs,
           blackMs: game.clock.blackMs,
+          initialMs: game.clock.initialMs,
+          incrementMs: game.clock.incrementMs,
           running: game.clock.running,
           active: game.clock.active,
         }
@@ -199,6 +204,10 @@ app.get("/health", (_, res) => res.json({ ok: true }));
 app.post("/api/games", (req, res) => {
   const id = newGameId();
 
+  // Accept time control from client (default to 5+0 if not provided)
+  const timeMs = Number(req.body?.timeMs) || INITIAL_CLOCK_MS;
+  const incrementMs = Number(req.body?.incrementMs) || 0;
+
   const game = {
     id,
     createdAt: nowMs(),
@@ -230,8 +239,10 @@ app.post("/api/games", (req, res) => {
     },
 
     clock: {
-      whiteMs: INITIAL_CLOCK_MS,
-      blackMs: INITIAL_CLOCK_MS,
+      whiteMs: timeMs,
+      blackMs: timeMs,
+      initialMs: timeMs,
+      incrementMs: incrementMs,
       running: false,
       active: "w",
       lastTs: null,
@@ -510,8 +521,15 @@ io.on("connection", (socket) => {
       game.moves.push({ from: mv.from, to: mv.to, san: mv.san });
       game.drawOffer = null;
 
-      // switch clock to opponent
+      // Add increment to the player who just moved, then switch clock to opponent
       if (game.clock?.running) {
+        // Player who moved is opposite of current turn (after move)
+        const movedColor = game.chess.turn() === "w" ? "b" : "w";
+        const increment = game.clock.incrementMs || 0;
+        if (increment > 0) {
+          if (movedColor === "w") game.clock.whiteMs += increment;
+          else game.clock.blackMs += increment;
+        }
         game.clock.active = game.chess.turn();
         game.clock.lastTs = nowMs();
       }

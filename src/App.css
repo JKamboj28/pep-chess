@@ -645,6 +645,86 @@ body {
   height: 100%;
   overflow: hidden; /* prevent page overflow */
 }
+
+/* Time Control Selector */
+.time-control-panel {
+  margin-bottom: 12px;
+}
+
+.time-control-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.time-control-category {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.time-control-category-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.time-control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.time-control-btn {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(71, 85, 105, 0.5);
+  border-radius: 6px;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.time-control-btn:hover {
+  background: rgba(51, 65, 85, 0.9);
+  border-color: rgba(100, 116, 139, 0.7);
+  color: #f1f5f9;
+}
+
+.time-control-btn-selected {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: #60a5fa;
+}
+
+.time-control-btn-selected:hover {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.8);
+  color: #93c5fd;
+}
+
+.time-control-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.time-control-current {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.time-control-increment {
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
 /*
 .pep-panel {
   margin-top: 2px;

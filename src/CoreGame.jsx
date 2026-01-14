@@ -62,7 +62,27 @@ const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };
 // order icons appear in material row (lichess-ish)
 const CAPTURE_ORDER = ["q", "r", "b", "n", "p"];
 
-const START_TIME_MS = 5 * 60 * 1000; // 5+0 blitz
+// Time control options (popular formats from Chess.com/Lichess)
+const TIME_CONTROLS = [
+  // Bullet
+  { label: "1+0", timeMs: 1 * 60 * 1000, incrementMs: 0, category: "Bullet" },
+  { label: "1+1", timeMs: 1 * 60 * 1000, incrementMs: 1000, category: "Bullet" },
+  { label: "2+1", timeMs: 2 * 60 * 1000, incrementMs: 1000, category: "Bullet" },
+  // Blitz
+  { label: "3+0", timeMs: 3 * 60 * 1000, incrementMs: 0, category: "Blitz" },
+  { label: "3+2", timeMs: 3 * 60 * 1000, incrementMs: 2000, category: "Blitz" },
+  { label: "5+0", timeMs: 5 * 60 * 1000, incrementMs: 0, category: "Blitz" },
+  { label: "5+3", timeMs: 5 * 60 * 1000, incrementMs: 3000, category: "Blitz" },
+  // Rapid
+  { label: "10+0", timeMs: 10 * 60 * 1000, incrementMs: 0, category: "Rapid" },
+  { label: "10+5", timeMs: 10 * 60 * 1000, incrementMs: 5000, category: "Rapid" },
+  { label: "15+10", timeMs: 15 * 60 * 1000, incrementMs: 10000, category: "Rapid" },
+  // Classical
+  { label: "30+0", timeMs: 30 * 60 * 1000, incrementMs: 0, category: "Classical" },
+  { label: "30+20", timeMs: 30 * 60 * 1000, incrementMs: 20000, category: "Classical" },
+];
+
+const DEFAULT_TIME_CONTROL = TIME_CONTROLS.find(tc => tc.label === "5+0");
 
 const START_COUNTS = { p: 8, n: 2, b: 2, r: 2, q: 1 };
 
@@ -314,8 +334,8 @@ function App() {
   const hasStarted = moves.length > 0;
 
   // clocks (local)
-  const [whiteTime, setWhiteTime] = useState(START_TIME_MS);
-  const [blackTime, setBlackTime] = useState(START_TIME_MS);
+  const [whiteTime, setWhiteTime] = useState(DEFAULT_TIME_CONTROL.timeMs);
+  const [blackTime, setBlackTime] = useState(DEFAULT_TIME_CONTROL.timeMs);
   const [activeColor, setActiveColor] = useState(null); // 'w' or 'b'
   const [timerStarted, setTimerStarted] = useState(false);
   const [flaggedSide, setFlaggedSide] = useState(null); // 'w' | 'b' | null
@@ -383,6 +403,7 @@ function App() {
   const [mpMoveRows, setMpMoveRows] = useState([]);
   const [leftOnlineGame, setLeftOnlineGame] = useState(false); // Track if we just left an online game
   const [leftAsSeat, setLeftAsSeat] = useState(null); // Track what seat user was when they left (for UI logic)
+  const [selectedTimeControl, setSelectedTimeControl] = useState(DEFAULT_TIME_CONTROL);
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -392,9 +413,9 @@ function App() {
       : false;
 
 // ----- Online clock values coming from mp-server state -----
-const onlineWhiteMs = mpState?.clock?.whiteMs ?? mpState?.whiteTimeMs ?? START_TIME_MS;
+const onlineWhiteMs = mpState?.clock?.whiteMs ?? mpState?.whiteTimeMs ?? selectedTimeControl.timeMs;
 
-const onlineBlackMs = mpState?.clock?.blackMs ?? mpState?.blackTimeMs ?? START_TIME_MS;
+const onlineBlackMs = mpState?.clock?.blackMs ?? mpState?.blackTimeMs ?? selectedTimeControl.timeMs;
 
 const onlineClockActive = mpState?.clock?.active ?? mpState?.turn ?? "w";
 const onlineClockRunning = !!mpState?.clock?.running && mpState?.status === "playing";
@@ -577,8 +598,8 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMoves([]);
     setStatus("White to move.");
 
-    setWhiteTime(START_TIME_MS);
-    setBlackTime(START_TIME_MS);
+    setWhiteTime(DEFAULT_TIME_CONTROL.timeMs);
+    setBlackTime(DEFAULT_TIME_CONTROL.timeMs);
     setActiveColor(null);
     setTimerStarted(false);
     setFlaggedSide(null);
@@ -1045,7 +1066,14 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
   async function createMpGame() {
     setMode("online");
     setMpStatusMsg("Creating online game...");
-    const r = await fetch(`${MP_URL}/api/games`, { method: "POST" });
+    const r = await fetch(`${MP_URL}/api/games`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        timeMs: selectedTimeControl.timeMs,
+        incrementMs: selectedTimeControl.incrementMs,
+      }),
+    });
     const data = await r.json();
 
     setMpGameId(data.gameId);
@@ -2283,6 +2311,40 @@ const copyInvite = async () => {
                   {currentPlayerHasMoved ? "Resign" : (pepMatchId ? "Abort & Refund" : "Abort")}
                 </button>
               </>
+            )}
+          </div>
+
+          {/* Time Control Selector */}
+          <div className="time-control-panel">
+            <h2 className="pep-title">Time Control</h2>
+            {(!mpGameId || (mpState?.status === "waiting" && !hasAnyGameMove)) ? (
+              <>
+                <div className="time-control-categories">
+                  {["Bullet", "Blitz", "Rapid", "Classical"].map(category => (
+                    <div key={category} className="time-control-category">
+                      <div className="time-control-category-label">{category}</div>
+                      <div className="time-control-buttons">
+                        {TIME_CONTROLS.filter(tc => tc.category === category).map(tc => (
+                          <button
+                            key={tc.label}
+                            className={`time-control-btn ${selectedTimeControl.label === tc.label ? "time-control-btn-selected" : ""}`}
+                            onClick={() => setSelectedTimeControl(tc)}
+                          >
+                            {tc.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="time-control-display">
+                <span className="time-control-current">{mpState?.clock?.label || selectedTimeControl.label}</span>
+                {selectedTimeControl.incrementMs > 0 && (
+                  <span className="time-control-increment">+{selectedTimeControl.incrementMs / 1000}s per move</span>
+                )}
+              </div>
             )}
           </div>
 
