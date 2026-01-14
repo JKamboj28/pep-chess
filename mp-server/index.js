@@ -216,6 +216,10 @@ app.post("/api/games", (req, res) => {
   const creatorColor = colorPref === "black" ? "black" : "white";
   const joinerColor = creatorColor === "white" ? "black" : "white";
 
+  // Accept stake and creator's address from client
+  const stake = req.body?.stake ? Number(req.body.stake) : null;
+  const creatorAddress = req.body?.creatorAddress || null;
+
   const game = {
     id,
     createdAt: nowMs(),
@@ -237,9 +241,9 @@ app.post("/api/games", (req, res) => {
     reason: "",
 
     pep: {
-      stake: null,
-      whiteAddress: null,
-      blackAddress: null,
+      stake: stake,
+      whiteAddress: creatorColor === "white" ? creatorAddress : null,
+      blackAddress: creatorColor === "black" ? creatorAddress : null,
       matchId: null,
       whiteEscrow: null,
       blackEscrow: null,

@@ -1068,6 +1068,10 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
   async function createMpGame() {
     setMode("online");
     setMpStatusMsg("Creating online game...");
+
+    // Get the creator's address based on selected color
+    const creatorAddress = selectedColorPref === "black" ? pepBlackAddress : pepWhiteAddress;
+
     const r = await fetch(`${MP_URL}/api/games`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1075,6 +1079,8 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         timeMs: selectedTimeControl.timeMs,
         incrementMs: selectedTimeControl.incrementMs,
         colorPref: selectedColorPref, // "white", "black", or "random"
+        stake: pepStake ? Number(pepStake) : null,
+        creatorAddress: creatorAddress || null,
       }),
     });
     const data = await r.json();
