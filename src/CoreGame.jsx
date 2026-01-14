@@ -405,6 +405,7 @@ function App() {
   const [leftAsSeat, setLeftAsSeat] = useState(null); // Track what seat user was when they left (for UI logic)
   const [selectedTimeControl, setSelectedTimeControl] = useState(DEFAULT_TIME_CONTROL);
   const [selectedColorPref, setSelectedColorPref] = useState("white"); // "white", "black", or "random"
+  const [isSettingUpGame, setIsSettingUpGame] = useState(false); // Track if user is configuring a new game
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -2073,21 +2074,32 @@ const copyInvite = async () => {
               <button className="reset-btn" onClick={leaveOnlineGame}>
                 Leave Game
               </button>
-            ) : leftAsSeat === "black" ? (
-              // Black left the game - don't show New Game button that makes them white
-              <span className="left-game-msg">Left the game</span>
-            ) : (
+            ) : isSettingUpGame ? (
+              // In setup mode - show Create Game button
               <button
-                className="reset-btn"
+                className="reset-btn create-game-btn"
                 onClick={() => {
-                  // Reset board and create new online game
                   resetBoardOnlyLocal();
                   mpChessRef.current = new Chess();
                   setLeftOnlineGame(false);
                   setLeftAsSeat(null);
-                  setPepStake("");
                   setMpStatusMsg("");
-                  createMpGame(); // Create new online game immediately
+                  createMpGame();
+                  setIsSettingUpGame(false);
+                }}
+              >
+                Create Game
+              </button>
+            ) : (
+              // Not in game - show New Game button to enter setup
+              <button
+                className="reset-btn"
+                onClick={() => {
+                  setIsSettingUpGame(true);
+                  setLeftAsSeat(null);
+                  setPepStake("");
+                  setSelectedColorPref("white");
+                  setSelectedTimeControl(DEFAULT_TIME_CONTROL);
                 }}
               >
                 New Game
@@ -2316,8 +2328,8 @@ const copyInvite = async () => {
             )}
           </div>
 
-          {/* Color Preference Selector - only show before game is created */}
-          {!mpGameId && (
+          {/* Color Preference Selector - only show during game setup */}
+          {!mpGameId && isSettingUpGame && (
             <div className="color-pref-panel">
               <h2 className="pep-title">Play As</h2>
               <div className="color-pref-buttons">
@@ -2346,13 +2358,14 @@ const copyInvite = async () => {
             </div>
           )}
 
-          {/* Time Control Selector */}
+          {/* Time Control Selector - show during setup or when game exists */}
+          {(isSettingUpGame || mpGameId) && (
           <div className="time-control-panel">
             <h2 className="pep-title">Time Control</h2>
-            {(!mpGameId || (mpState?.status === "waiting" && !hasAnyGameMove)) ? (
-              <>
-                <div className="time-control-categories">
-                  {["Bullet", "Blitz", "Rapid", "Classical"].map(category => (
+            {(isSettingUpGame || (mpState?.status === "waiting" && !hasAnyGameMove)) ? (
+              <div className="time-control-grid">
+                <div className="time-control-column">
+                  {["Bullet", "Blitz"].map(category => (
                     <div key={category} className="time-control-category">
                       <div className="time-control-category-label">{category}</div>
                       <div className="time-control-buttons">
@@ -2369,7 +2382,25 @@ const copyInvite = async () => {
                     </div>
                   ))}
                 </div>
-              </>
+                <div className="time-control-column">
+                  {["Rapid", "Classical"].map(category => (
+                    <div key={category} className="time-control-category">
+                      <div className="time-control-category-label">{category}</div>
+                      <div className="time-control-buttons">
+                        {TIME_CONTROLS.filter(tc => tc.category === category).map(tc => (
+                          <button
+                            key={tc.label}
+                            className={`time-control-btn ${selectedTimeControl.label === tc.label ? "time-control-btn-selected" : ""}`}
+                            onClick={() => setSelectedTimeControl(tc)}
+                          >
+                            {tc.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="time-control-display">
                 <span className="time-control-current">
@@ -2385,8 +2416,10 @@ const copyInvite = async () => {
               </div>
             )}
           </div>
+          )}
 
-          {/* PEP match controls */}
+          {/* PEP match controls - show during setup or when game exists */}
+          {(isSettingUpGame || mpGameId) && (
           <div className="pep-panel">
             <h2 className="pep-title">PEP Stake (optional)</h2>
             <p className="pep-subtitle">
@@ -2412,7 +2445,7 @@ const copyInvite = async () => {
                     }
                   }
                 }}
-                disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && mpState?.status !== "waiting")}
+                disabled={isPepMatchLocked || hasAnyGameMove || (isOnline && !isSettingUpGame && mpState?.status !== "waiting")}
                 placeholder="0"
               />
             </div>
@@ -2618,6 +2651,7 @@ const copyInvite = async () => {
             {pepError && <div className="pep-error">{pepError}</div>}
 
           </div>
+          )}
         </div>
       </div>
     </div>

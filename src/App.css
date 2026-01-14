@@ -191,6 +191,15 @@ body {
   font-style: italic;
 }
 
+.create-game-btn {
+  background: #16a34a !important;
+  color: #fff !important;
+}
+
+.create-game-btn:hover {
+  background: #15803d !important;
+}
+
 /* Copy invite button */
 .copy-invite-btn {
   padding: 6px 14px;
@@ -690,6 +699,13 @@ body {
 .color-pref-icon {
   font-size: 28px;
   line-height: 1;
+  /* Add dark outline for white pieces to be visible */
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 0 4px rgba(0,0,0,0.5);
 }
 
 /* Time Control Selector */
@@ -697,7 +713,13 @@ body {
   margin-bottom: 12px;
 }
 
-.time-control-categories {
+.time-control-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.time-control-column {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -710,7 +732,7 @@ body {
 }
 
 .time-control-category-label {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
@@ -720,16 +742,16 @@ body {
 .time-control-buttons {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .time-control-btn {
-  padding: 6px 12px;
-  font-size: 0.8rem;
+  padding: 5px 10px;
+  font-size: 0.75rem;
   font-weight: 600;
   background: rgba(30, 41, 59, 0.8);
   border: 1px solid rgba(71, 85, 105, 0.5);
-  border-radius: 6px;
+  border-radius: 5px;
   color: #cbd5e1;
   cursor: pointer;
   transition: all 0.15s ease;
