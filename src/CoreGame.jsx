@@ -2340,9 +2340,15 @@ const copyInvite = async () => {
               </>
             ) : (
               <div className="time-control-display">
-                <span className="time-control-current">{mpState?.clock?.label || selectedTimeControl.label}</span>
-                {selectedTimeControl.incrementMs > 0 && (
-                  <span className="time-control-increment">+{selectedTimeControl.incrementMs / 1000}s per move</span>
+                <span className="time-control-current">
+                  {mpState?.clock?.initialMs
+                    ? `${Math.floor(mpState.clock.initialMs / 60000)}+${Math.floor((mpState.clock.incrementMs || 0) / 1000)}`
+                    : selectedTimeControl.label}
+                </span>
+                {(mpState?.clock?.incrementMs || selectedTimeControl.incrementMs) > 0 && (
+                  <span className="time-control-increment">
+                    +{(mpState?.clock?.incrementMs || selectedTimeControl.incrementMs) / 1000}s per move
+                  </span>
                 )}
               </div>
             )}
