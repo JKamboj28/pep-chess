@@ -2521,14 +2521,14 @@ const copyInvite = async () => {
                   </>
                 )}
 
-                {/* Only show Create PEP match button for local games */}
-                {!isOnline && (
+                {/* Show Create PEP match button - for local games always, for online only before match is created */}
+                {(!isOnline || !pepMatchId) && (
                   <button
                     className="pep-button"
                     onClick={createPepMatch}
                     disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
                   >
-                    {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchId ? "Create new match" : "Create PEP match"}
+                    {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchStatus === "creating" ? "Creating..." : (pepMatchId ? "Create new match" : "Create PEP match")}
                   </button>
                 )}
               </>
