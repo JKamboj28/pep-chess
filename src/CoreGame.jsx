@@ -244,12 +244,14 @@ const MP_KEYS = {
   gameId: "pepchess_mp_gameId",
   token: "pepchess_mp_token",
   seat: "pepchess_mp_seat",
+  isCreator: "pepchess_mp_isCreator",
 };
 
-function saveMpSession(gameId, token, seat) {
+function saveMpSession(gameId, token, seat, isCreator = false) {
   localStorage.setItem(MP_KEYS.gameId, gameId);
   localStorage.setItem(MP_KEYS.token, token);
   localStorage.setItem(MP_KEYS.seat, seat);
+  localStorage.setItem(MP_KEYS.isCreator, isCreator ? "true" : "false");
 }
 
 function loadMpSession() {
@@ -257,6 +259,7 @@ function loadMpSession() {
     gameId: localStorage.getItem(MP_KEYS.gameId) || "",
     token: localStorage.getItem(MP_KEYS.token) || "",
     seat: localStorage.getItem(MP_KEYS.seat) || "spectator",
+    isCreator: localStorage.getItem(MP_KEYS.isCreator) === "true",
   };
 }
 
@@ -264,6 +267,7 @@ function clearMpSessionStorage() {
   localStorage.removeItem(MP_KEYS.gameId);
   localStorage.removeItem(MP_KEYS.token);
   localStorage.removeItem(MP_KEYS.seat);
+  localStorage.removeItem(MP_KEYS.isCreator);
 }
 
 function pgnToRows(pgn) {
@@ -406,6 +410,7 @@ function App() {
   const [selectedTimeControl, setSelectedTimeControl] = useState(DEFAULT_TIME_CONTROL);
   const [selectedColorPref, setSelectedColorPref] = useState("white"); // "white", "black", or "random"
   const [isSettingUpGame, setIsSettingUpGame] = useState(false); // Track if user is configuring a new game
+  const [isGameCreator, setIsGameCreator] = useState(false); // Track if current player created the game (vs joined via invite)
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -1044,7 +1049,9 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     s.on("joined", (payload) => {
       setMpSeat(payload.seat);
       setMpState(payload.state);
-      saveMpSession(gid, tok, payload.seat);
+      // Preserve the creator flag from existing session when re-saving
+      const existingSession = loadMpSession();
+      saveMpSession(gid, tok, payload.seat, existingSession.isCreator);
     });
 
     s.on("state", (st) => setMpState(st));
@@ -1089,7 +1096,8 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMpToken(data.token);
     setMpSeat(data.color);
     setMpState(data.state);
-    saveMpSession(data.gameId, data.token, data.color);
+    setIsGameCreator(true); // Mark as creator
+    saveMpSession(data.gameId, data.token, data.color, true);
     setMpStatusMsg("Online game created.");
   }
 
@@ -1112,7 +1120,8 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMpToken(data.token);
     setMpSeat(data.color);
     setMpState(data.state);
-    saveMpSession(data.gameId, data.token, data.color);
+    setIsGameCreator(false); // Mark as joiner (not creator)
+    saveMpSession(data.gameId, data.token, data.color, false);
     setMpStatusMsg(`Joined as ${data.color}.`);
   }
 
@@ -1136,6 +1145,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMpPendingPromotion(null);
     setMpCheckSquare(null);
     setMpMoveRows([]);
+    setIsGameCreator(false); // Reset creator flag
 
     // Clear PEP state when leaving game
     setPepMatchId(null);
@@ -1256,6 +1266,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       setMpGameId(sess.gameId);
       setMpToken(sess.token);
       setMpSeat(sess.seat);
+      setIsGameCreator(sess.isCreator);
       setMpStatusMsg("Reconnected to online game.");
       return;
     }
@@ -2521,8 +2532,8 @@ const copyInvite = async () => {
                   </>
                 )}
 
-                {/* Show Create PEP match button - for local games always, for online only before match is created */}
-                {(!isOnline || !pepMatchId) && (
+                {/* Create PEP match button - for local games always, for online only joiner can create */}
+                {!isOnline && (
                   <button
                     className="pep-button"
                     onClick={createPepMatch}
@@ -2530,6 +2541,24 @@ const copyInvite = async () => {
                   >
                     {pepPendingResetConfirm ? "Confirm PEP match" : pepMatchStatus === "creating" ? "Creating..." : (pepMatchId ? "Create new match" : "Create PEP match")}
                   </button>
+                )}
+
+                {/* For online games: Only joiner sees the Create button */}
+                {isOnline && !pepMatchId && !isGameCreator && (
+                  <button
+                    className="pep-button"
+                    onClick={createPepMatch}
+                    disabled={!canCreatePepMatch || pepMatchStatus === "creating"}
+                  >
+                    {pepMatchStatus === "creating" ? "Creating..." : "Create PEP match"}
+                  </button>
+                )}
+
+                {/* For online games: Creator sees status message instead of button */}
+                {isOnline && !pepMatchId && isGameCreator && bothAddressesSet && (
+                  <div className="pep-waiting-message">
+                    Waiting for {mpSeat === "white" ? "Black" : "White"} to create PEP match...
+                  </div>
                 )}
               </>
             )}

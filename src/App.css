@@ -903,6 +903,18 @@ body {
   cursor: default;
 }
 
+.pep-waiting-message {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .pep-status-row {
   margin-top: 4px;
   display: flex;
