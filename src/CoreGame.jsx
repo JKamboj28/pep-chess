@@ -2476,22 +2476,45 @@ const copyInvite = async () => {
                   <>
                     <div className="pep-field-row">
                       <label className="pep-label">Your PEP payout address</label>
-                      <input
-                        className="pep-input"
-                        type="text"
-                        value={mpSeat === "white" ? pepWhiteAddress : pepBlackAddress}
-                        onChange={(e) => {
-                          const addr = e.target.value;
-                          if (mpSeat === "white") setPepWhiteAddress(addr);
-                          else setPepBlackAddress(addr);
-                          // Sync to server
-                          if (socketRef.current) {
-                            mpSetPepInfo(undefined, addr);
-                          }
-                        }}
-                        disabled={isPepMatchLocked}
-                        placeholder="Enter your Pepecoin address"
-                      />
+                      {(() => {
+                        const currentAddr = mpSeat === "white" ? pepWhiteAddress : pepBlackAddress;
+                        const addrTrimmed = (currentAddr || "").trim();
+                        const isValid = isProbablyPepAddress(addrTrimmed);
+                        const showValidation = addrTrimmed.length > 0;
+                        return (
+                          <>
+                            <input
+                              className={`pep-input ${showValidation ? (isValid ? "pep-input-valid" : "pep-input-invalid") : ""}`}
+                              type="text"
+                              value={currentAddr}
+                              onChange={(e) => {
+                                const addr = e.target.value;
+                                if (mpSeat === "white") setPepWhiteAddress(addr);
+                                else setPepBlackAddress(addr);
+                                // Sync to server
+                                if (socketRef.current) {
+                                  mpSetPepInfo(undefined, addr);
+                                }
+                              }}
+                              disabled={isPepMatchLocked}
+                              placeholder="Enter your Pepecoin address (starts with P)"
+                            />
+                            {showValidation && (
+                              <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
+                                {isValid
+                                  ? "✓ Valid address format"
+                                  : !addrTrimmed.startsWith("P")
+                                    ? "Address must start with 'P'"
+                                    : addrTrimmed.length < 30
+                                      ? `Too short (${addrTrimmed.length}/30+ chars needed)`
+                                      : addrTrimmed.length > 40
+                                        ? `Too long (max 40 chars)`
+                                        : "Invalid characters in address"}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Show status of opponent's address (only after they've joined) */}
@@ -2508,32 +2531,72 @@ const copyInvite = async () => {
                   <>
                     <div className="pep-field-row">
                       <label className="pep-label">White PEP payout address</label>
-                      <input
-                        className="pep-input"
-                        type="text"
-                        value={pepWhiteAddress}
-                        onChange={(e) => setPepWhiteAddress(e.target.value)}
-                        disabled={isPepMatchLocked}
-                        placeholder=""
-                      />
+                      {(() => {
+                        const addrTrimmed = (pepWhiteAddress || "").trim();
+                        const isValid = isProbablyPepAddress(addrTrimmed);
+                        const showValidation = addrTrimmed.length > 0;
+                        return (
+                          <>
+                            <input
+                              className={`pep-input ${showValidation ? (isValid ? "pep-input-valid" : "pep-input-invalid") : ""}`}
+                              type="text"
+                              value={pepWhiteAddress}
+                              onChange={(e) => setPepWhiteAddress(e.target.value)}
+                              disabled={isPepMatchLocked}
+                              placeholder="Pepecoin address (starts with P)"
+                            />
+                            {showValidation && (
+                              <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
+                                {isValid
+                                  ? "✓ Valid"
+                                  : !addrTrimmed.startsWith("P")
+                                    ? "Must start with 'P'"
+                                    : addrTrimmed.length < 30
+                                      ? `Too short (${addrTrimmed.length}/30+)`
+                                      : "Invalid"}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="pep-field-row">
                       <label className="pep-label">Black PEP payout address</label>
-                      <input
-                        className="pep-input"
-                        type="text"
-                        value={pepBlackAddress}
-                        onChange={(e) => setPepBlackAddress(e.target.value)}
-                        disabled={isPepMatchLocked}
-                        placeholder=""
-                      />
+                      {(() => {
+                        const addrTrimmed = (pepBlackAddress || "").trim();
+                        const isValid = isProbablyPepAddress(addrTrimmed);
+                        const showValidation = addrTrimmed.length > 0;
+                        return (
+                          <>
+                            <input
+                              className={`pep-input ${showValidation ? (isValid ? "pep-input-valid" : "pep-input-invalid") : ""}`}
+                              type="text"
+                              value={pepBlackAddress}
+                              onChange={(e) => setPepBlackAddress(e.target.value)}
+                              disabled={isPepMatchLocked}
+                              placeholder="Pepecoin address (starts with P)"
+                            />
+                            {showValidation && (
+                              <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
+                                {isValid
+                                  ? "✓ Valid"
+                                  : !addrTrimmed.startsWith("P")
+                                    ? "Must start with 'P'"
+                                    : addrTrimmed.length < 30
+                                      ? `Too short (${addrTrimmed.length}/30+)`
+                                      : "Invalid"}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </>
                 )}
 
-                {/* Create PEP match button - for local games always, for online only joiner can create */}
-                {!isOnline && (
+                {/* Create PEP match button - only for LOCAL games (not during online game setup) */}
+                {!isOnline && !isSettingUpGame && (
                   <button
                     className="pep-button"
                     onClick={createPepMatch}
