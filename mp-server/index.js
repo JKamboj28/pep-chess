@@ -638,6 +638,33 @@ io.on("connection", (socket) => {
     broadcastState(game);
   });
 
+  // Abort game (before any moves or before current player has moved)
+  socket.on("abort", () => {
+    const game = getBoundGame();
+    if (!game) return socket.emit("error_msg", { error: "Game not found." });
+
+    const seat = seatFromToken(game, socket.data.token);
+    if (seat !== "white" && seat !== "black") return socket.emit("error_msg", { error: "Invalid token." });
+    if (game.status === "ended") return;
+
+    // Can only abort before the current player has made a move
+    // White can abort if no moves made, Black can abort if <= 1 move made
+    const moveCount = game.moves.length;
+    const canAbort = (seat === "white" && moveCount === 0) || (seat === "black" && moveCount <= 1);
+
+    if (!canAbort) {
+      return socket.emit("error_msg", { error: "Cannot abort after making a move. Use resign instead." });
+    }
+
+    game.status = "ended";
+    game.result = "";
+    game.reason = "aborted";
+    game.drawOffer = null;
+    pauseClock(game);
+
+    broadcastState(game);
+  });
+
   socket.on("disconnect", () => {
     const game = getBoundGame();
     if (!game) return;

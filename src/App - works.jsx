@@ -51,10 +51,10 @@ const API_BASE_URL =
 */
 
 const API_BASE_URL =
-  import.meta.env.VITE_PEP_API_URL || "http://34.151.137.151:8001";
+  import.meta.env.VITE_PEP_API_URL || "http://5.223.75.104:8001";
 
 /*
-const API_BASE_URL = "http://34.151.137.151:8001";
+const API_BASE_URL = "http://5.223.75.104:8001";
 */
 // piece values for material diff
 const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9 };

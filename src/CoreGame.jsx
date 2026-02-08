@@ -133,7 +133,7 @@ function isProbablyPepAddress(addr) {
   if (!addr) return false;
   const a = addr.trim();
   if (!a.startsWith("P")) return false;
-  if (a.length < 30 || a.length > 40) return false;
+  if (a.length !== 34) return false; // Pepecoin addresses are exactly 34 characters
   if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(a)) return false;
   return true;
 }
@@ -411,6 +411,7 @@ function App() {
   const [selectedColorPref, setSelectedColorPref] = useState("white"); // "white", "black", or "random"
   const [isSettingUpGame, setIsSettingUpGame] = useState(false); // Track if user is configuring a new game
   const [isGameCreator, setIsGameCreator] = useState(false); // Track if current player created the game (vs joined via invite)
+  const [inviteCopied, setInviteCopied] = useState(false); // Track invite link copy status
 
   const mpIsPlayer = mpSeat === "white" || mpSeat === "black";
   const mpMyTurn =
@@ -1046,6 +1047,11 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
 
     s.on("disconnect", () => setMpConnected(false));
 
+    s.on("connect_error", (err) => {
+      console.error("Socket connection error:", err);
+      setMpStatusMsg(`Connection error: ${err.message || "Cannot reach server"}`);
+    });
+
     s.on("joined", (payload) => {
       setMpSeat(payload.seat);
       setMpState(payload.state);
@@ -1076,29 +1082,44 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMode("online");
     setMpStatusMsg("Creating online game...");
 
-    // Get the creator's address based on selected color
-    const creatorAddress = selectedColorPref === "black" ? pepBlackAddress : pepWhiteAddress;
+    try {
+      // Get the creator's address based on selected color
+      const creatorAddress = selectedColorPref === "black" ? pepBlackAddress : pepWhiteAddress;
 
-    const r = await fetch(`${MP_URL}/api/games`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        timeMs: selectedTimeControl.timeMs,
-        incrementMs: selectedTimeControl.incrementMs,
-        colorPref: selectedColorPref, // "white", "black", or "random"
-        stake: pepStake ? Number(pepStake) : null,
-        creatorAddress: creatorAddress || null,
-      }),
-    });
-    const data = await r.json();
+      const r = await fetch(`${MP_URL}/api/games`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          timeMs: selectedTimeControl.timeMs,
+          incrementMs: selectedTimeControl.incrementMs,
+          colorPref: selectedColorPref, // "white", "black", or "random"
+          stake: pepStake ? Number(pepStake) : null,
+          creatorAddress: creatorAddress || null,
+        }),
+      });
 
-    setMpGameId(data.gameId);
-    setMpToken(data.token);
-    setMpSeat(data.color);
-    setMpState(data.state);
-    setIsGameCreator(true); // Mark as creator
-    saveMpSession(data.gameId, data.token, data.color, true);
-    setMpStatusMsg("Online game created.");
+      if (!r.ok) {
+        const errorText = await r.text();
+        throw new Error(errorText || `Server returned ${r.status}`);
+      }
+
+      const data = await r.json();
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setMpGameId(data.gameId);
+      setMpToken(data.token);
+      setMpSeat(data.color);
+      setMpState(data.state);
+      setIsGameCreator(true); // Mark as creator
+      saveMpSession(data.gameId, data.token, data.color, true);
+      setMpStatusMsg("Online game created.");
+    } catch (err) {
+      console.error("Failed to create game:", err);
+      setMpStatusMsg(`Failed to create game: ${err.message || "Connection error"}`);
+    }
   }
 
   async function joinMpGameById(id) {
@@ -1108,21 +1129,32 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     setMode("online");
     setMpStatusMsg("Joining online game...");
 
-    const r = await fetch(`${MP_URL}/api/games/${gid}/join`, { method: "POST" });
-    const data = await r.json();
+    try {
+      const r = await fetch(`${MP_URL}/api/games/${gid}/join`, { method: "POST" });
 
-    if (data.error) {
-      setMpStatusMsg(`Join failed: ${data.error}`);
-      return;
+      if (!r.ok) {
+        const errorText = await r.text();
+        throw new Error(errorText || `Server returned ${r.status}`);
+      }
+
+      const data = await r.json();
+
+      if (data.error) {
+        setMpStatusMsg(`Join failed: ${data.error}`);
+        return;
+      }
+
+      setMpGameId(data.gameId);
+      setMpToken(data.token);
+      setMpSeat(data.color);
+      setMpState(data.state);
+      setIsGameCreator(false); // Mark as joiner (not creator)
+      saveMpSession(data.gameId, data.token, data.color, false);
+      setMpStatusMsg(`Joined as ${data.color}.`);
+    } catch (err) {
+      console.error("Failed to join game:", err);
+      setMpStatusMsg(`Failed to join game: ${err.message || "Connection error"}`);
     }
-
-    setMpGameId(data.gameId);
-    setMpToken(data.token);
-    setMpSeat(data.color);
-    setMpState(data.state);
-    setIsGameCreator(false); // Mark as joiner (not creator)
-    saveMpSession(data.gameId, data.token, data.color, false);
-    setMpStatusMsg(`Joined as ${data.color}.`);
   }
 
   function leaveOnlineGame() {
@@ -1408,6 +1440,11 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
   function mpDeclineDraw() {
     if (!socketRef.current) return;
     socketRef.current.emit("decline_draw", { gameId: mpGameId, token: mpToken });
+  }
+
+  function mpAbort() {
+    if (!socketRef.current) return;
+    socketRef.current.emit("abort", { gameId: mpGameId, token: mpToken });
   }
 
   // Send PEP info (stake/address) to server
@@ -1974,15 +2011,7 @@ function renderCapturedRow(sideColor) {
     ? mpStatusText(mpState) + (pepBoardLocked ? " (PEP: waiting for deposits)" : "")
     : status;
 
-  // Invite link:
-  // - Always include ?game=<mpGameId>
-  // - Include stake + white address so Black can see them when joining
-  // - Black will create the PEP match after entering their address
-
-// near the top of CoreGame component with other hooks
-const [inviteCopied, setInviteCopied] = useState(false);
-
-// Build invite URL - just gameId, PEP info is synced via server
+  // Invite link - just gameId, PEP info is synced via server
 const inviteUrl =
   isOnline && mpGameId
     ? `${window.location.origin}/?game=${mpGameId}`
@@ -2269,15 +2298,25 @@ const copyInvite = async () => {
               <div className="game-ended-message">
                 {pepMatchStatus === "aborted"
                   ? "Match aborted - deposits refunded"
-                  : mpState?.reason === "resignation"
-                    ? `Game ended: ${mpState?.result === "1-0" ? "White" : "Black"} wins by resignation`
-                    : mpState?.reason === "checkmate"
-                      ? `Checkmate! ${mpState?.result === "1-0" ? "White" : "Black"} wins`
-                      : mpState?.reason === "timeout"
-                        ? `Time out! ${mpState?.result === "1-0" ? "White" : mpState?.result === "0-1" ? "Black" : "Draw"}`
-                        : mpState?.reason
-                          ? `Game ended: ${mpState.reason}`
-                          : "Game ended"}
+                  : mpState?.reason === "aborted"
+                    ? "Game aborted"
+                    : mpState?.reason === "resignation"
+                      ? `Game ended: ${mpState?.result === "1-0" ? "White" : "Black"} wins by resignation`
+                      : mpState?.reason === "checkmate"
+                        ? `Checkmate! ${mpState?.result === "1-0" ? "White" : "Black"} wins`
+                        : mpState?.reason === "timeout"
+                          ? `Time out! ${mpState?.result === "1-0" ? "White" : mpState?.result === "0-1" ? "Black" : "Draw"}`
+                          : mpState?.reason === "agreed draw"
+                            ? "Game drawn by agreement"
+                            : mpState?.reason === "stalemate"
+                              ? "Draw by stalemate"
+                              : mpState?.reason === "threefold repetition"
+                                ? "Draw by threefold repetition"
+                                : mpState?.reason === "insufficient material"
+                                  ? "Draw by insufficient material"
+                                  : mpState?.reason
+                                    ? `Game ended: ${mpState.reason}`
+                                    : "Game ended"}
               </div>
             ) : (
               <>
@@ -2336,7 +2375,7 @@ const copyInvite = async () => {
                 {/* Show Abort/Abort & Refund before player's first move, Resign after */}
                 <button
                   className="control-btn control-btn-resign"
-                  onClick={currentPlayerHasMoved ? mpResign : (pepMatchId ? abortPepMatch : mpResign)}
+                  onClick={currentPlayerHasMoved ? mpResign : (pepMatchId ? abortPepMatch : mpAbort)}
                   disabled={!mpIsPlayer || !mpState || mpState.status !== "playing" || pepMatchStatus === "aborted"}
                 >
                   {currentPlayerHasMoved ? "Resign" : (pepMatchId ? "Abort & Refund" : "Abort")}
@@ -2477,7 +2516,9 @@ const copyInvite = async () => {
                     <div className="pep-field-row">
                       <label className="pep-label">Your PEP payout address</label>
                       {(() => {
-                        const currentAddr = mpSeat === "white" ? pepWhiteAddress : pepBlackAddress;
+                        // During setup, mpSeat is "spectator" — use selectedColorPref to match createMpGame logic
+                        const effectiveSeat = (mpSeat === "white" || mpSeat === "black") ? mpSeat : (selectedColorPref === "black" ? "black" : "white");
+                        const currentAddr = effectiveSeat === "white" ? pepWhiteAddress : pepBlackAddress;
                         const addrTrimmed = (currentAddr || "").trim();
                         const isValid = isProbablyPepAddress(addrTrimmed);
                         const showValidation = addrTrimmed.length > 0;
@@ -2489,7 +2530,7 @@ const copyInvite = async () => {
                               value={currentAddr}
                               onChange={(e) => {
                                 const addr = e.target.value;
-                                if (mpSeat === "white") setPepWhiteAddress(addr);
+                                if (effectiveSeat === "white") setPepWhiteAddress(addr);
                                 else setPepBlackAddress(addr);
                                 // Sync to server
                                 if (socketRef.current) {
@@ -2498,6 +2539,7 @@ const copyInvite = async () => {
                               }}
                               disabled={isPepMatchLocked}
                               placeholder="Enter your Pepecoin address (starts with P)"
+                              maxLength={34}
                             />
                             {showValidation && (
                               <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
@@ -2505,11 +2547,9 @@ const copyInvite = async () => {
                                   ? "✓ Valid address format"
                                   : !addrTrimmed.startsWith("P")
                                     ? "Address must start with 'P'"
-                                    : addrTrimmed.length < 30
-                                      ? `Too short (${addrTrimmed.length}/30+ chars needed)`
-                                      : addrTrimmed.length > 40
-                                        ? `Too long (max 40 chars)`
-                                        : "Invalid characters in address"}
+                                    : addrTrimmed.length < 34
+                                      ? `Too short (${addrTrimmed.length}/34 chars needed)`
+                                      : "Invalid characters in address"}
                               </div>
                             )}
                           </>
@@ -2544,6 +2584,7 @@ const copyInvite = async () => {
                               onChange={(e) => setPepWhiteAddress(e.target.value)}
                               disabled={isPepMatchLocked}
                               placeholder="Pepecoin address (starts with P)"
+                              maxLength={34}
                             />
                             {showValidation && (
                               <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
@@ -2551,8 +2592,8 @@ const copyInvite = async () => {
                                   ? "✓ Valid"
                                   : !addrTrimmed.startsWith("P")
                                     ? "Must start with 'P'"
-                                    : addrTrimmed.length < 30
-                                      ? `Too short (${addrTrimmed.length}/30+)`
+                                    : addrTrimmed.length < 34
+                                      ? `Too short (${addrTrimmed.length}/34)`
                                       : "Invalid"}
                               </div>
                             )}
@@ -2576,6 +2617,7 @@ const copyInvite = async () => {
                               onChange={(e) => setPepBlackAddress(e.target.value)}
                               disabled={isPepMatchLocked}
                               placeholder="Pepecoin address (starts with P)"
+                              maxLength={34}
                             />
                             {showValidation && (
                               <div className={`pep-address-validation ${isValid ? "valid" : "invalid"}`}>
@@ -2583,8 +2625,8 @@ const copyInvite = async () => {
                                   ? "✓ Valid"
                                   : !addrTrimmed.startsWith("P")
                                     ? "Must start with 'P'"
-                                    : addrTrimmed.length < 30
-                                      ? `Too short (${addrTrimmed.length}/30+)`
+                                    : addrTrimmed.length < 34
+                                      ? `Too short (${addrTrimmed.length}/34)`
                                       : "Invalid"}
                               </div>
                             )}
