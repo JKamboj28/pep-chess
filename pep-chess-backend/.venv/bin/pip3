@@ -1,4 +1,4 @@
-#!/opt/pep-chess/pep-chess-backend/.venv/bin/python
+#!/home/jayesh/pep-chess/pep-chess-backend/.venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
