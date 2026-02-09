@@ -663,11 +663,22 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
         fenOverride ||
         (isOnline ? (mpState?.fen || "") : game.fen());
 
-      const res = await fetch(`${API_BASE_URL}/api/matches/${pepMatchId}/result`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ result, pgn, finalFen }),
-      });
+      let res;
+      if (isOnline && mpGameId && mpToken) {
+        // Online: proxy through mp-server (port 8001 not exposed externally)
+        res = await fetch(`${MP_URL}/api/games/${mpGameId}/pep/result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: mpToken, result }),
+        });
+      } else {
+        // Local: call PEP backend directly
+        res = await fetch(`${API_BASE_URL}/api/matches/${pepMatchId}/result`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ result, pgn, finalFen }),
+        });
+      }
 
       if (!res.ok) {
         const text = await res.text();
@@ -826,7 +837,12 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
 
     const poll = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/matches/${pepMatchId}`);
+        // Online: poll through mp-server proxy (port 8001 not exposed externally)
+        // Local: poll PEP backend directly
+        const pollUrl = isOnline && mpGameId
+          ? `${MP_URL}/api/games/${mpGameId}/pep/status`
+          : `${API_BASE_URL}/api/matches/${pepMatchId}`;
+        const res = await fetch(pollUrl);
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
@@ -879,7 +895,7 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [pepMatchId, pepStake]);
+  }, [pepMatchId, pepStake, isOnline, mpGameId]);
 
   // ---------------------------
   // Local move application

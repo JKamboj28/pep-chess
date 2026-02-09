@@ -370,6 +370,64 @@ app.post("/api/games/:id/pep/create", async (req, res) => {
   }
 });
 
+// Poll PEP match status (proxy to Python backend so browser doesn't need port 8001)
+app.get("/api/games/:id/pep/status", async (req, res) => {
+  const id = (req.params.id || "").trim();
+  const game = games.get(id);
+  if (!game) return res.status(404).json({ error: "Game not found." });
+
+  if (!game.pep.matchId) {
+    return res.status(400).json({ error: "No PEP match created yet." });
+  }
+
+  try {
+    const r = await _fetch(`${API_BASE}/api/matches/${game.pep.matchId}`);
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json(data);
+
+    // Update local game pep status from backend response
+    if (data.status) game.pep.status = data.status;
+
+    return res.json(data);
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to reach PEP backend." });
+  }
+});
+
+// Report PEP match result (proxy to Python backend)
+app.post("/api/games/:id/pep/result", async (req, res) => {
+  const id = (req.params.id || "").trim();
+  const game = games.get(id);
+  if (!game) return res.status(404).json({ error: "Game not found." });
+
+  const { token, result } = req.body || {};
+  const seat = seatFromToken(game, token);
+  if (seat === "spectator") {
+    return res.status(403).json({ error: "Only players can report results." });
+  }
+
+  if (!game.pep.matchId) {
+    return res.status(400).json({ error: "No PEP match to settle." });
+  }
+
+  try {
+    const r = await _fetch(`${API_BASE}/api/matches/${game.pep.matchId}/result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ result }),
+    });
+
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json(data);
+
+    if (data.status) game.pep.status = data.status;
+    broadcastState(game);
+    return res.json(data);
+  } catch (e) {
+    return res.status(500).json({ error: "Failed to report result to PEP backend." });
+  }
+});
+
 // Abort PEP match - broadcasts status to both players
 app.post("/api/games/:id/pep/abort", async (req, res) => {
   const id = (req.params.id || "").trim();

@@ -163,9 +163,9 @@ def get_match(match_id: str):
             else:
                 m["status"] = "waiting_for_deposits"
 
-        except Exception:
-            # Node might be offline; keep last known values
-            pass
+        except Exception as exc:
+            # Node might be offline; keep last known values but log it
+            print(f"[WARNING] RPC error checking deposits for match {match_id}: {exc}")
 
     return {
         "matchId": m["id"],
