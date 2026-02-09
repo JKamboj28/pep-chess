@@ -1173,7 +1173,22 @@ const showBlackEscrow = !isOnline ? true : seat === "black";
     }
   }
 
-  function leaveOnlineGame() {
+  async function leaveOnlineGame() {
+    // If there's an active PEP match, abort and refund before leaving
+    if (pepMatchId && pepMatchStatus !== "aborted" && pepMatchStatus !== "settled") {
+      try {
+        if (mpGameId && mpToken) {
+          await fetch(`${MP_URL}/api/games/${mpGameId}/pep/abort`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: mpToken }),
+          });
+        }
+      } catch {
+        // Best-effort abort; continue leaving even if it fails
+      }
+    }
+
     // Remember what seat we were before clearing (for UI logic)
     setLeftAsSeat(mpSeat);
 

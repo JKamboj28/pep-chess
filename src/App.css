@@ -948,7 +948,7 @@ body {
 }
 
 .pep-status-row {
-  margin-top: 4px;
+  margin-top: 12px;
   display: flex;
   gap: 6px;
   font-size: 0.78rem;
